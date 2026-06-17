@@ -1,0 +1,198 @@
+{
+  "name": "Nivasi Space - College Room Rental Platform",
+  "short_name": "Nivasi Space",
+  "description": "Find the perfect college room for rent on Nivasi Space. Browse listings, view features and conditions, and contact owners directly. Nivasi college room rental, student accommodation, hostel, PG, shared accommodation.",
+  "id": "/",
+  "start_url": "/",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui",
+    "browser"
+  ],
+  "background_color": "#ffffff",
+  "theme_color": "#F97316",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": [
+    "lifestyle",
+    "education",
+    "business",
+    "housing",
+    "student",
+    "accommodation"
+  ],
+  "keywords": [
+    "nivasi",
+    "nivasi space",
+    "college room rental",
+    "student accommodation",
+    "room for rent",
+    "hostel",
+    "PG",
+    "shared accommodation",
+    "college housing",
+    "student housing",
+    "room finder",
+    "nivasi room rental",
+    "nivasi college accommodation",
+    "student hostel",
+    "college PG",
+    "campus housing",
+    "student room finder",
+    "nivasi space room rental",
+    "college room finder",
+    "student accommodation near college",
+    "nivasi student housing",
+    "college hostel",
+    "student PG accommodation",
+    "campus room rental",
+    "college accommodation finder",
+    "student room rental",
+    "nivasi space accommodation",
+    "college housing finder",
+    "student hostel finder",
+    "college room booking",
+    "student accommodation booking",
+    "nivasi space student housing",
+    "college room search",
+    "student accommodation search",
+    "campus room finder",
+    "college housing search",
+    "student room search",
+    "nivasi space college housing",
+    "college accommodation booking",
+    "student hostel booking",
+    "campus accommodation",
+    "college room rental platform",
+    "student accommodation platform",
+    "nivasi space platform",
+    "college housing platform",
+    "student room rental platform",
+    "campus accommodation platform",
+    "college room finder platform",
+    "student accommodation finder platform",
+    "nivasi space finder",
+    "college housing finder platform",
+    "student room finder platform",
+    "campus room rental platform",
+    "college accommodation finder platform",
+    "student hostel finder platform",
+    "college room booking platform",
+    "student accommodation booking platform",
+    "nivasi space booking",
+    "college housing booking platform",
+    "student room booking platform",
+    "campus room booking platform",
+    "college accommodation booking platform",
+    "student hostel booking platform",
+    "campus accommodation booking platform",
+    "college room rental service",
+    "student accommodation service",
+    "nivasi space service",
+    "college housing service",
+    "student room rental service",
+    "campus accommodation service",
+    "college room finder service",
+    "student accommodation finder service",
+    "nivasi space finder service",
+    "college housing finder service",
+    "student room finder service",
+    "campus room rental service",
+    "college accommodation finder service",
+    "student hostel finder service",
+    "college room booking service",
+    "student accommodation booking service",
+    "nivasi space booking service",
+    "college housing booking service",
+    "student room booking service",
+    "campus room booking service",
+    "college accommodation booking service",
+    "student hostel booking service",
+    "campus accommodation booking service"
+  ],
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-wide.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    },
+    {
+      "src": "/screenshot-narrow.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false,
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+  "launch_handler": {
+    "client_mode": [
+      "navigate-existing",
+      "focus-existing"
+    ]
+  },
+  "handle_links": "preferred",
+  "protocol_handlers": [
+    {
+      "protocol": "web+nivasi",
+      "url": "/?room=%s"
+    }
+  ],
+  "serviceworker": {
+    "src": "/sw.js",
+    "scope": "/",
+    "type": "classic",
+    "update_via_cache": "none"
+  },
+  "share_target": {
+    "action": "/",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "file_handlers": [],
+  "shortcuts": [
+    {
+      "name": "Browse Rooms",
+      "short_name": "Rooms",
+      "description": "Browse available rooms",
+      "url": "/",
+      "icons": [
+        {
+          "src": "/logo.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "My Profile",
+      "short_name": "Profile",
+      "description": "View your profile",
+      "url": "/profile",
+      "icons": [
+        {
+          "src": "/logo.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}
