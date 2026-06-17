@@ -58,21 +58,31 @@ export async function initiatePayment(orderData) {
 
   if (!response.ok) {
     const errBody = await response.json().catch(() => ({}));
+    console.error('[paymentService] create-order failed:', response.status, errBody);
     throw new Error(errBody.error || `Failed to create payment order (${response.status})`);
   }
 
   // API returns snake_case keys: payment_session_id, order_id
-  const { payment_session_id, order_id } = await response.json();
+  const data = await response.json();
 
-  if (!payment_session_id) {
-    throw new Error('No payment_session_id returned from /api/create-order');
+  // Debug log — helps diagnose payment_session_id issues in production
+  console.log('[paymentService] create-order response:', JSON.stringify(data));
+
+  // Validate payment_session_id before opening checkout
+  if (!data.payment_session_id) {
+    console.error('[paymentService] Missing payment_session_id in response:', data);
+    throw new Error('Missing payment_session_id — cannot open checkout. Check Cashfree credentials and order configuration.');
   }
+
+  const { payment_session_id, order_id } = data;
 
   // 3. Determine environment (sandbox vs production)
   //    Default to sandbox unless we are on a non-localhost production build.
   const isProduction =
     import.meta.env.PROD && !window.location.hostname.includes('localhost');
   const cashfreeMode = isProduction ? 'production' : 'sandbox';
+
+  console.log(`[paymentService] Opening Cashfree checkout in ${cashfreeMode} mode | order: ${order_id} | session: ${payment_session_id.substring(0, 20)}...`);
 
   // 4. Initialize Cashfree instance
   const cashfree = CashfreeConstructor({ mode: cashfreeMode });

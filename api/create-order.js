@@ -131,19 +131,43 @@ export default async function handler(req, res) {
   // ── Call Cashfree SDK ──────────────────────────────────────────────────────
   try {
     const response = await Cashfree.PGCreateOrder('2023-08-01', orderRequest);
-    const order    = response.data;
 
-    console.log(`[create-order] Order created: ${order.order_id} | ₹${order.order_amount}`);
+    // Log the full raw response for debugging
+    console.log('[create-order] Raw Cashfree response status:', response?.status);
+    console.log('[create-order] Raw Cashfree response data:', JSON.stringify(response?.data));
+
+    // The SDK wraps the Cashfree API response in an Axios response object.
+    // response.data is the OrderEntity from Cashfree.
+    const order = response?.data;
+
+    if (!order) {
+      console.error('[create-order] Cashfree returned empty response data');
+      return res.status(500).json({ error: 'Failed to create order — empty response from Cashfree' });
+    }
+
+    // Extract payment_session_id — validate it exists and is non-empty
+    const paymentSessionId = order.payment_session_id;
+
+    if (!paymentSessionId) {
+      console.error('[create-order] Cashfree response missing payment_session_id. Full order:', JSON.stringify(order));
+      return res.status(500).json({
+        error: 'Failed to create order — no payment_session_id in Cashfree response',
+        order_status: order.order_status,
+      });
+    }
+
+    console.log(`[create-order] Order created: ${order.order_id} | ₹${order.order_amount} | session: ${paymentSessionId.substring(0, 20)}...`);
 
     return res.status(200).json({
-      payment_session_id: order.payment_session_id,
+      payment_session_id: paymentSessionId,
       order_id:           order.order_id,
       order_amount:       order.order_amount,
       order_status:       order.order_status,
     });
   } catch (err) {
     const detail = err?.response?.data ?? err.message;
-    console.error('[create-order] Cashfree API error:', detail);
-    return res.status(502).json({ error: 'Failed to create payment order', detail });
+    console.error('[create-order] Cashfree API error:', JSON.stringify(detail));
+    console.error('[create-order] Full error:', err?.message, err?.stack);
+    return res.status(500).json({ error: 'Failed to create order', detail });
   }
 }
