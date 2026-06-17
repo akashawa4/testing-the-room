@@ -12,6 +12,8 @@ import { useLanguage } from './contexts/LanguageContext.jsx';
 import { useAuth } from './contexts/AuthContext.jsx';
 import { useUserPreferences } from './contexts/UserPreferencesContext.jsx';
 import './App.css';
+import { isSubscriptionActive } from './utils/subscriptionConfig.js';
+import { initiatePayment, verifyPayment } from './services/paymentService.js';
 
 // Lazy load modal components
 const RoomDetailModal = lazy(() => import('./components/RoomDetailModal.jsx'));
@@ -216,6 +218,72 @@ function App() {
     }
   }, [rooms, isLoadingRooms, isAuthenticated]);
 
+  // Check for Cashfree payment status redirect on mount
+  useEffect(() => {
+    const checkPaymentRedirect = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const paymentStatusParam = urlParams.get('payment_status');
+      const orderIdParam = urlParams.get('order_id');
+
+      if (paymentStatusParam === 'check' && orderIdParam) {
+        // Clean URL immediately so refresh doesn't trigger verification again
+        window.history.replaceState({}, document.title, window.location.pathname);
+        
+        setNotification({
+          message: 'Verifying subscription payment with Cashfree...',
+          type: 'info',
+          isVisible: true,
+          title: 'Verifying Payment'
+        });
+
+        try {
+          const result = await verifyPayment(orderIdParam);
+
+          if (result.status === 'success') {
+            setNotification({
+              message: 'Your subscription is now active! The listing is published and visible to students.',
+              type: 'success',
+              isVisible: true,
+              title: 'Payment Successful!'
+            });
+            
+            // Reload rooms to get updated status
+            const { fetchRooms } = await import('./services/roomService.js');
+            const firestoreRooms = await fetchRooms();
+            const { sampleRooms } = await import('./data/rooms.js');
+            const firestoreKeys = new Set(
+              firestoreRooms.map(r => `${(r.title || '').toLowerCase().trim()}|${(r.contact || '').trim()}|${r.rent}`)
+            );
+            const newStaticRooms = sampleRooms.filter(room => {
+              const key = `${(room.title || '').toLowerCase().trim()}|${(room.contact || '').trim()}|${room.rent}`;
+              return !firestoreKeys.has(key);
+            });
+            setRooms(deduplicateRooms([...firestoreRooms, ...newStaticRooms]));
+          } else {
+            setNotification({
+              message: `Payment not completed. Status: ${result.orderStatus || 'Pending'}`,
+              type: 'warning',
+              isVisible: true,
+              title: 'Payment Pending'
+            });
+          }
+        } catch (error) {
+          console.error('Error verifying payment redirect:', error);
+          setNotification({
+            message: 'Could not verify payment: ' + error.message,
+            type: 'error',
+            isVisible: true,
+            title: 'Verification Error'
+          });
+        }
+      }
+    };
+
+    if (!isLoadingRooms) {
+      checkPaymentRedirect();
+    }
+  }, [isLoadingRooms]);
+
   // Load mess data lazily when selected first time
   useEffect(() => {
     const loadMess = async () => {
@@ -324,6 +392,16 @@ function App() {
         return false;
       }
 
+      // Hide expired/unpaid listings from students (legacy/grandfathered rooms remain visible)
+      if (!isAdmin && room.subscriptionStatus !== undefined) {
+        const active = room.subscriptionStatus === 'active' && isSubscriptionActive(room.subscriptionEnd);
+        const paid = room.paymentStatus === 'paid';
+        const published = room.isPublished === true;
+        if (!active || !paid || !published) {
+          return false;
+        }
+      }
+
       // Gender filtering - only show rooms matching the selected gender
       let matchesGender = true;
       if (selectedGender) {
@@ -381,25 +459,60 @@ function App() {
       const savedRoom = await addRoom(newRoom);
       setRooms(prev => deduplicateRooms([savedRoom, ...prev]));
       setShowAddForm(false);
+      
       setNotification({
-        message: 'Your new room listing is now live and visible to students.',
-        type: 'success',
+        message: 'Redirecting to Cashfree to complete subscription payment...',
+        type: 'info',
         isVisible: true,
-        title: 'Room Added Successfully!'
+        title: 'Redirecting to Payment'
+      });
+
+      // Initiate Cashfree payment checkout
+      await initiatePayment({
+        roomId: savedRoom.id,
+        roomType: savedRoom.roomType || savedRoom.rooms || '1 RK',
+        customerName: user?.displayName || 'Nivasi Host',
+        customerEmail: user?.email || 'payments@nivasi.space',
+        customerPhone: savedRoom.contact || '9999999999'
       });
     } catch (error) {
-      console.error('Error adding room:', error);
-      // Still add locally even if Firestore fails
-      setRooms(prev => deduplicateRooms([newRoom, ...prev]));
+      console.error('Error adding room or initiating payment:', error);
       setShowAddForm(false);
       setNotification({
-        message: 'Room saved locally. Will sync when connection is restored.',
-        type: 'warning',
+        message: 'Failed to initiate payment: ' + error.message,
+        type: 'error',
         isVisible: true,
-        title: 'Room Saved Locally'
+        title: 'Payment Error'
       });
     }
-  }, []);
+  }, [user]);
+
+  const handleRenewRoomSubscription = useCallback(async (room) => {
+    try {
+      setNotification({
+        message: 'Redirecting to Cashfree to renew subscription...',
+        type: 'info',
+        isVisible: true,
+        title: 'Redirecting to Payment'
+      });
+
+      await initiatePayment({
+        roomId: room.id,
+        roomType: room.roomType || room.rooms || '1 RK',
+        customerName: user?.displayName || 'Nivasi Host',
+        customerEmail: user?.email || 'payments@nivasi.space',
+        customerPhone: room.contact || '9999999999'
+      });
+    } catch (error) {
+      console.error('Error renewing subscription:', error);
+      setNotification({
+        message: 'Failed to initiate renewal: ' + error.message,
+        type: 'error',
+        isVisible: true,
+        title: 'Renewal Error'
+      });
+    }
+  }, [user]);
 
   const handleBookingSuccess = useCallback(() => {
     setShowBookingModal(false);
@@ -945,6 +1058,7 @@ function App() {
                       onEdit={() => setEditRoom(room)}
                       onDelete={() => handleRequestDeleteRoom(room)}
                       onToggleHidden={() => handleRequestToggleHidden(room)}
+                      onRenew={handleRenewRoomSubscription}
                       t={t}
                     />
                   ))}

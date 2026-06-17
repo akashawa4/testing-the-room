@@ -3,11 +3,19 @@ import { MapPin, Phone, ExternalLink, Heart, Star, ChevronLeft, ChevronRight, X 
 import { Button } from '@/components/ui/button.jsx';
 import { Dialog, DialogContent } from '@/components/ui/dialog.jsx';
 import { useLanguage } from '../contexts/LanguageContext.jsx';
+import { isSubscriptionActive, isExpiringSoon, getDaysUntilExpiry } from '../utils/subscriptionConfig.js';
 
-const RoomCard = memo(({ room, onViewDetails, isAdmin, onEdit, onDelete, isFirst, onBookNow, onToggleHidden }) => {
+const RoomCard = memo(({ room, onViewDetails, isAdmin, onEdit, onDelete, isFirst, onBookNow, onToggleHidden, onRenew }) => {
   const { t } = useLanguage();
   const [modalOpen, setModalOpen] = useState(false);
   const [modalImageIdx, setModalImageIdx] = useState(0);
+
+  const hasSubscription = room.subscriptionStatus !== undefined;
+  const getFormattedDate = (timestamp) => {
+    if (!timestamp) return '';
+    const date = timestamp.seconds ? new Date(timestamp.seconds * 1000) : new Date(timestamp);
+    return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  };
 
   const handleCallClick = useCallback(() => {
     window.location.href = `tel:${room.contact}`;
@@ -145,6 +153,32 @@ const RoomCard = memo(({ room, onViewDetails, isAdmin, onEdit, onDelete, isFirst
 
       {/* Enhanced Content Section */}
       <div className="space-y-2 flex-1 flex flex-col">
+        {/* Subscription Status for Admin */}
+        {isAdmin && hasSubscription && (
+          <div className="flex flex-wrap gap-1 mb-1">
+            {room.paymentStatus === 'pending' && (
+              <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-300">
+                Payment Pending
+              </span>
+            )}
+            {room.paymentStatus === 'paid' && isSubscriptionActive(room.subscriptionEnd) && (
+              isExpiringSoon(room.subscriptionEnd) ? (
+                <span className="bg-orange-100 text-orange-800 text-[10px] font-bold px-2 py-0.5 rounded border border-orange-300">
+                  Expiring in {getDaysUntilExpiry(room.subscriptionEnd)} days
+                </span>
+              ) : (
+                <span className="bg-green-100 text-green-800 text-[10px] font-bold px-2 py-0.5 rounded border border-green-300">
+                  Active until {getFormattedDate(room.subscriptionEnd)}
+                </span>
+              )
+            )}
+            {room.paymentStatus === 'paid' && !isSubscriptionActive(room.subscriptionEnd) && (
+              <span className="bg-red-100 text-red-800 text-[10px] font-bold px-2 py-0.5 rounded border border-red-300">
+                Expired
+              </span>
+            )}
+          </div>
+        )}
         {/* Title and Price */}
         <div className="flex-shrink-0">
           <h3 className="text-lg font-bold text-gray-900 mb-1 line-clamp-2 leading-tight">
@@ -223,6 +257,24 @@ const RoomCard = memo(({ room, onViewDetails, isAdmin, onEdit, onDelete, isFirst
         {/* Admin Actions */}
         {isAdmin && (
           <div className="flex flex-col gap-1.5 sm:gap-2 mt-2">
+            {hasSubscription && room.paymentStatus === 'pending' && (
+              <Button
+                onClick={() => onRenew && onRenew(room)}
+                className="w-full flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm h-9 sm:h-10 bg-gradient-to-r from-amber-500 to-orange-600 text-white hover:from-amber-600 hover:to-orange-700 font-bold touch-manipulation active:scale-[0.98] transition-transform"
+                size="sm"
+              >
+                Pay Listing Subscription (₹{room.subscriptionAmount || 100})
+              </Button>
+            )}
+            {hasSubscription && room.paymentStatus === 'paid' && (!isSubscriptionActive(room.subscriptionEnd) || isExpiringSoon(room.subscriptionEnd)) && (
+              <Button
+                onClick={() => onRenew && onRenew(room)}
+                className="w-full flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm h-9 sm:h-10 bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 font-bold touch-manipulation active:scale-[0.98] transition-transform"
+                size="sm"
+              >
+                {isSubscriptionActive(room.subscriptionEnd) ? 'Renew Subscription early' : 'Renew Subscription (Expired)'}
+              </Button>
+            )}
             <Button
               onClick={handleToggleHidden}
               variant="outline"

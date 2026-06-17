@@ -1,5 +1,6 @@
 // Room Service - Firestore operations for rooms
 import { db, collection, doc, getDocs, addDoc, updateDoc, deleteDoc, serverTimestamp } from '../firebase.js';
+import { getSubscriptionAmount } from '../utils/subscriptionConfig.js';
 
 const ROOMS_COLLECTION = 'rooms';
 
@@ -38,14 +39,32 @@ export const fetchRooms = async () => {
 };
 
 /**
- * Add a new room to Firestore
+ * Add a new room to Firestore with subscription fields initialized to pending
  */
 export const addRoom = async (roomData) => {
     try {
         const roomsRef = collection(db, ROOMS_COLLECTION);
+        
+        let amount = 0;
+        try {
+            amount = getSubscriptionAmount(roomData.roomType || roomData.rooms || '1 RK');
+        } catch (e) {
+            console.error('Error getting subscription amount:', e);
+        }
+
+        const subscriptionFields = {
+            subscriptionAmount: amount,
+            paymentStatus: 'pending',
+            subscriptionStatus: 'pending',
+            subscriptionStart: null,
+            subscriptionEnd: null,
+            paymentOrderId: null,
+            isPublished: false
+        };
 
         const roomToAdd = omitUndefined({
             ...roomData,
+            ...subscriptionFields,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
         });
@@ -57,7 +76,8 @@ export const addRoom = async (roomData) => {
 
         return {
             id: docRef.id,
-            ...roomData
+            ...roomData,
+            ...subscriptionFields
         };
     } catch (error) {
         console.error('Error adding room to Firestore:', error);

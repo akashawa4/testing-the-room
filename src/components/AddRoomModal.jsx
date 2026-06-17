@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button.jsx';
 import { Checkbox } from '@/components/ui/checkbox.jsx';
 import { useLanguage } from '../contexts/LanguageContext.jsx';
 import ConfirmationModal from './ConfirmationModal.jsx';
+import { ROOM_TYPE_PRICING, SUBSCRIPTION_DURATION_DAYS } from '../utils/subscriptionConfig.js';
 
 // Predefined features list
 const AVAILABLE_FEATURES = [
@@ -335,22 +336,26 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
     setSubmitMessage('');
 
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      onAddRoom(pendingRoomData);
-      setSubmitMessage(isEdit ? t('roomUpdatedSuccessfully') : t('roomAddedSuccessfully'));
-
-      // Close modal after success
-      setTimeout(() => {
+      if (isEdit) {
+        // Edit flow: save and show success before closing
+        await new Promise(resolve => setTimeout(resolve, 800));
+        onAddRoom(pendingRoomData);
+        setSubmitMessage(t('roomUpdatedSuccessfully'));
+        setTimeout(() => { onClose(); }, 1500);
+      } else {
+        // New room flow: save room → Cashfree redirect happens in parent (handleAddRoom)
+        // Close the modal immediately so the payment redirect isn't blocked
+        setSubmitMessage('Saving room, redirecting to payment…');
+        await new Promise(resolve => setTimeout(resolve, 600));
         onClose();
-      }, 1500);
-
+        onAddRoom(pendingRoomData);
+      }
     } catch (error) {
       setSubmitMessage(t('errorAddingRoom'));
-    } finally {
       setIsSubmitting(false);
+    } finally {
       setPendingRoomData(null);
+      if (isEdit) setIsSubmitting(false);
     }
   };
 
@@ -499,6 +504,10 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
                     <option key={opt} value={opt}>{opt}</option>
                   ))}
                 </select>
+                <div className="mt-2 text-xs text-orange-600 bg-orange-50 border border-orange-200 rounded p-2 flex items-center justify-between">
+                  <span>Subscription: <strong>₹{ROOM_TYPE_PRICING[formData.roomType || '1 RK']}</strong></span>
+                  <span>Duration: <strong>{SUBSCRIPTION_DURATION_DAYS} Days</strong></span>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Pricing *</label>
