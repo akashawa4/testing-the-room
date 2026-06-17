@@ -70,10 +70,32 @@ export default async function handler(req, res) {
   // ── Parse & validate body ──────────────────────────────────────────────────
   const { roomId, roomType, customerName, customerEmail, customerPhone } = req.body ?? {};
 
-  if (!roomId || !roomType || !customerName || !customerPhone) {
+  // Log roomId and its type for debugging
+  console.log('roomId:', roomId);
+  console.log('roomId type:', typeof roomId);
+
+  if (!roomId) {
     return res.status(400).json({
-      error: 'Missing required fields: roomId, roomType, customerName, customerPhone',
+      error: 'Missing roomId',
     });
+  }
+
+  if (!roomType || !customerName || !customerPhone) {
+    return res.status(400).json({
+      error: 'Missing required fields: roomType, customerName, customerPhone',
+    });
+  }
+
+  // Safely normalize roomId
+  let normalizedRoomId = '';
+  if (typeof roomId === 'string') {
+    normalizedRoomId = roomId;
+  } else if (typeof roomId === 'number') {
+    normalizedRoomId = String(roomId);
+  } else if (roomId && typeof roomId === 'object') {
+    normalizedRoomId = typeof roomId.id === 'string' ? roomId.id : (roomId.id ? String(roomId.id) : String(roomId));
+  } else {
+    normalizedRoomId = String(roomId);
   }
 
   // ── Resolve amount from roomType (server-side — never trust client) ────────
@@ -87,7 +109,7 @@ export default async function handler(req, res) {
   // ── Build order ────────────────────────────────────────────────────────────
   // Order ID embeds roomId so the webhook can extract it without a DB lookup.
   // Format: order_<roomId>_<unixMs>
-  const orderId = `order_${roomId}_${Date.now()}`;
+  const orderId = `order_${normalizedRoomId}_${Date.now()}`;
   const origin  = resolveOrigin(req);
 
   const orderRequest = {
@@ -95,7 +117,7 @@ export default async function handler(req, res) {
     order_amount:   amount,
     order_currency: 'INR',
     customer_details: {
-      customer_id:    `cust_${roomId.slice(0, 12)}`,
+      customer_id:    `cust_${normalizedRoomId.slice(0, 12)}`,
       customer_name:  customerName,
       customer_email: customerEmail || 'no-reply@nivasi.space',
       customer_phone: normalisePhone(customerPhone),
