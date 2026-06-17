@@ -77,11 +77,11 @@ export async function initiatePayment(orderData) {
   const { payment_session_id, order_id } = data;
 
   // 3. Determine environment (sandbox vs production)
-  //    Default to sandbox unless we are on a non-localhost production build.
-  const isProduction =
-    import.meta.env.PROD && !window.location.hostname.includes('localhost');
-  const cashfreeMode = isProduction ? 'production' : 'sandbox';
+  // Hardcoded to sandbox for current testing setup
+  const cashfreeMode = 'sandbox';
 
+  console.log('[Cashfree Debug] Mode:', cashfreeMode);
+  console.log('[Cashfree Debug] Session:', payment_session_id);
   console.log(`[paymentService] Opening Cashfree checkout in ${cashfreeMode} mode | order: ${order_id} | session: ${payment_session_id.substring(0, 20)}...`);
 
   // 4. Initialize Cashfree instance
