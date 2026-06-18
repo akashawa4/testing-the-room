@@ -52,6 +52,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
     } catch (err) {
       console.error('[LoginScreen] Sign-in error:', err);
       setError(getAuthErrorMessage(err));
+    } finally {
       setIsLoading(false);
     }
   };

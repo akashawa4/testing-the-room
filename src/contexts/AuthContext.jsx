@@ -20,24 +20,7 @@ export const useAuth = () => {
   return context;
 };
 
-/* -------------------- iOS SAFE DETECTION -------------------- */
-const shouldForceRedirect = () => {
-  const ua = navigator.userAgent || "";
-  const platform = navigator.platform || "";
-
-  const isIOS =
-    /iPad|iPhone|iPod/i.test(ua) ||
-    (platform === "MacIntel" && navigator.maxTouchPoints > 1);
-
-  const isInAppBrowser =
-    /FBAN|FBAV|Instagram|Line|MicroMessenger|WhatsApp|Telegram|wv/i.test(ua);
-
-  const isSafari = /^((?!chrome|android).)*safari/i.test(ua);
-
-  const isMobileSafari = isSafari && /Mobile|iPhone|iPad|iPod/i.test(ua);
-
-  return isIOS || isInAppBrowser || isMobileSafari;
-};
+/* iOS SAFE DETECTION REMOVED AS REQUESTED TO MATCH CHARGENEST POPUP FLOW */
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -103,33 +86,12 @@ export const AuthProvider = ({ children }) => {
 
     if (isOffline) throw new Error("No internet connection");
 
-    await setPersistence(auth, browserLocalPersistence);
-
-    const forceRedirect = shouldForceRedirect();
-
     try {
-      if (forceRedirect) {
-        setLoading(true);
-        await signInWithRedirect(auth, googleProvider);
-        return { method: "redirect" };
-      }
-
       await signInWithPopup(auth, googleProvider);
       return { method: "popup" };
-
-    } catch (err) {
-      console.warn("[auth] popup failed:", err?.code);
-
-      if (
-        err?.code === "auth/popup-blocked" ||
-        err?.code === "auth/popup-closed-by-user" ||
-        err?.code === "auth/cancelled-popup-request"
-      ) {
-        setLoading(true);
-        await signInWithRedirect(auth, googleProvider);
-        return { method: "redirect" };
-      }
-
+    } catch (error) {
+      console.error("[auth] popup failed:", error);
+      const err = new Error("Google sign-in failed. Please try again.");
       setAuthError(err);
       throw err;
     }
