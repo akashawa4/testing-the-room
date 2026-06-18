@@ -12,6 +12,8 @@ const LoginScreen = ({ onLoginSuccess }) => {
   const [error, setError] = useState('');
   const [retryCount, setRetryCount] = useState(0);
   const { isIOS } = detectWebView();
+  
+  const buttonLoading = isLoading || authLoading;
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -46,12 +48,13 @@ const LoginScreen = ({ onLoginSuccess }) => {
     clearAuthError();
 
     try {
-      await loginWithGoogle();
-      // onIdTokenChanged will update auth state; loading will be cleared in finally
+      const result = await loginWithGoogle();
+      if (result?.method !== "redirect") {
+        setIsLoading(false);
+      }
     } catch (err) {
       console.error('[LoginScreen] Sign-in error:', err);
       setError(getAuthErrorMessage(err));
-    } finally {
       setIsLoading(false);
     }
   };
@@ -121,11 +124,11 @@ const LoginScreen = ({ onLoginSuccess }) => {
         <div className="space-y-4">
           <Button
             onClick={handleGoogleSignIn}
-            disabled={isLoading || isOffline}
+            disabled={buttonLoading || isOffline}
             aria-label={isOffline ? "Sign in disabled due to no internet" : "Continue with Google"}
             className="w-full bg-white border-2 border-gray-300 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200 text-gray-700 py-3 text-lg font-semibold flex items-center justify-center gap-3 transition-all duration-200 hover:shadow-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
           >
-            {isLoading ? (
+            {buttonLoading ? (
               <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
             ) : isOffline ? (
               <WifiOff className="w-5 h-5" aria-hidden="true" />
@@ -137,7 +140,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
               </svg>
             )}
-            {isLoading ? 'Signing in...' : isOffline ? 'No Internet Connection' : 'Continue with Google'}
+            {buttonLoading ? 'Signing in...' : isOffline ? 'No Internet Connection' : 'Continue with Google'}
           </Button>
 
           <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">

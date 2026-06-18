@@ -146,12 +146,13 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       console.log("[auth] starting redirect sign-in");
       await signInWithRedirect(auth, googleProvider);
-      return;
+      return { method: "redirect" };
     }
 
     try {
       console.log("[auth] starting popup sign-in");
       await signInWithPopup(auth, googleProvider);
+      return { method: "popup" };
     } catch (err) {
       console.warn("[auth] popup failed, fallback redirect:", err?.code);
 
@@ -163,7 +164,7 @@ export const AuthProvider = ({ children }) => {
       ) {
         setLoading(true);
         await signInWithRedirect(auth, googleProvider);
-        return;
+        return { method: "redirect" };
       }
 
       setAuthError(err);
