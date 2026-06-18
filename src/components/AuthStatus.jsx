@@ -3,11 +3,11 @@ import { Loader2, AlertCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 const AuthStatus = () => {
-  const { loading, redirectLoading, authError, clearAuthError } = useAuth();
+  const { loading, authError, clearAuthError } = useAuth();
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    if (loading || redirectLoading || authError) {
+    if (loading || authError) {
       setIsVisible(true);
     }
     
@@ -22,20 +22,20 @@ const AuthStatus = () => {
     }
     
     // Auto dismiss loading if it finishes and there is no error
-    if (!loading && !redirectLoading && !authError) {
+    if (!loading && !authError) {
       setIsVisible(false);
     }
 
     return () => clearTimeout(timeout);
-  }, [loading, redirectLoading, authError, clearAuthError]);
+  }, [loading, authError, clearAuthError]);
 
   if (!isVisible) return null;
 
-  if (loading || redirectLoading) {
+  if (loading) {
     return (
       <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-gray-900 text-white rounded-full px-4 py-2 shadow-xl z-50 flex items-center gap-2 text-sm font-medium transition-all animate-in fade-in slide-in-from-bottom-4">
         <Loader2 className="w-4 h-4 animate-spin text-orange-400" />
-        <span>{redirectLoading ? 'Finishing sign in...' : 'Connecting...'}</span>
+        <span>Connecting...</span>
       </div>
     );
   }

@@ -8,7 +8,7 @@ const AuthDebug = () => {
     return null;
   }
 
-  const { user, loading, redirectLoading, authError, isAuthenticated } = useAuth();
+  const { user, loading, authError, isAuthenticated } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
   
   const detection = detectWebView();
@@ -41,7 +41,6 @@ const AuthDebug = () => {
           <h4 className="text-gray-400 mb-1">State</h4>
           <div className="grid grid-cols-2 gap-1">
             <span>Loading:</span><span className={loading ? 'text-yellow-400' : 'text-gray-300'}>{String(loading)}</span>
-            <span>Redirect Load:</span><span className={redirectLoading ? 'text-yellow-400' : 'text-gray-300'}>{String(redirectLoading)}</span>
             <span>Auth:</span><span className={isAuthenticated ? 'text-green-400' : 'text-red-400'}>{String(isAuthenticated)}</span>
           </div>
         </section>

@@ -1,29 +1,20 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button.jsx';
 import { useLanguage } from '../contexts/LanguageContext.jsx';
-import { useAuth, hasPendingRedirect, markPendingRedirect, clearPendingRedirectFlag } from '../contexts/AuthContext.jsx';
-import { auth, googleProvider, signInWithRedirect, signInWithPopup } from '../firebase.js';
-import { getAuthErrorMessage, getAuthSolutionSuggestions, getRecommendedAuthMethod, detectWebView } from '../utils/webview.js';
+import { useAuth } from '../contexts/AuthContext.jsx';
+import { getAuthErrorMessage, getAuthSolutionSuggestions, detectWebView } from '../utils/webview.js';
 import { Loader2, RefreshCw, AlertCircle, WifiOff } from 'lucide-react';
 
 const LoginScreen = ({ onLoginSuccess }) => {
   const { t } = useLanguage();
-  const { authError, clearAuthError, redirectLoading, isAuthenticated, isOffline } = useAuth();
+  const { loading: authLoading, authError, clearAuthError, isAuthenticated, isOffline, loginWithGoogle } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [retryCount, setRetryCount] = useState(0);
-  const [isRedirectPending, setIsRedirectPending] = useState(false);
   const { isIOS } = detectWebView();
 
   useEffect(() => {
-    if (hasPendingRedirect()) {
-      setIsRedirectPending(true);
-    }
-  }, []);
-
-  useEffect(() => {
     if (isAuthenticated) {
-      setIsRedirectPending(false);
       onLoginSuccess?.();
     }
   }, [isAuthenticated, onLoginSuccess]);
@@ -41,8 +32,6 @@ const LoginScreen = ({ onLoginSuccess }) => {
       const errorMessage = getAuthErrorMessage(authError);
       setError(errorMessage);
       setIsLoading(false);
-      setIsRedirectPending(false);
-      clearPendingRedirectFlag();
     }
   }, [authError]);
 
@@ -56,44 +45,12 @@ const LoginScreen = ({ onLoginSuccess }) => {
     setError('');
     clearAuthError();
 
-    const authMethod = getRecommendedAuthMethod();
-    console.log('[LoginScreen] Auth method:', authMethod, '| retry:', retryCount);
-
     try {
-      if (authMethod === 'popup') {
-        const result = await signInWithPopup(auth, googleProvider);
-        if (result?.user) {
-          setIsLoading(false);
-          // onIdTokenChanged handles user injection
-          return;
-        }
-      } else {
-        markPendingRedirect();
-        setIsRedirectPending(true);
-        await signInWithRedirect(auth, googleProvider);
-        return;
-      }
+      await loginWithGoogle();
+      // onIdTokenChanged will update auth state; loading will be cleared in finally
     } catch (err) {
       console.error('[LoginScreen] Sign-in error:', err);
-      
-      // Automatic fallback if popup is blocked
-      if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
-        console.log('[LoginScreen] Popup blocked/closed, falling back to redirect...');
-        try {
-          markPendingRedirect();
-          setIsRedirectPending(true);
-          await signInWithRedirect(auth, googleProvider);
-          return;
-        } catch (redirectErr) {
-          setError(getAuthErrorMessage(redirectErr));
-        }
-      } else {
-        setError(getAuthErrorMessage(err));
-      }
-
-      setIsRedirectPending(false);
-      clearPendingRedirectFlag();
-      setRetryCount(prev => prev + 1);
+      setError(getAuthErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
@@ -110,14 +67,12 @@ const LoginScreen = ({ onLoginSuccess }) => {
     setError('');
     clearAuthError();
     setRetryCount(0);
-    setIsRedirectPending(false);
-    clearPendingRedirectFlag();
   };
 
   const solutionSuggestions = error ? getAuthSolutionSuggestions({ message: error }) : [];
 
   // Show loading screen when returning from redirect
-  if (isRedirectPending || redirectLoading) {
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-100 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md mx-4 text-center">
@@ -125,7 +80,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
             <Loader2 className="w-10 h-10 text-white animate-spin" />
           </div>
           <h2 className="text-xl font-semibold text-gray-900 mb-2" aria-live="polite">
-            Completing Sign In...
+            Authenticating...
           </h2>
           <p className="text-gray-600 text-sm mb-4">
             Please wait while we verify your authentication.
@@ -188,7 +143,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
           <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-blue-700 text-xs text-center">
               {isIOS
-                ? 'You will be redirected to Google for secure sign-in. On iOS, this works best in Safari.'
+                ? 'On iPhone, Google sign-in opens in a secure redirect. Please complete login and return to Nivasi.'
                 : 'You will be redirected to Google for secure authentication'}
             </p>
           </div>

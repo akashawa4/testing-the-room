@@ -90,7 +90,7 @@ const deduplicateRooms = (rooms) => {
 
 function App() {
   const { t, currentLanguage } = useLanguage();
-  const { user, loading, isAuthenticated, redirectLoading } = useAuth();
+  const { user, loading, isAuthenticated } = useAuth();
   const { selectedGender, selectedLocation, isAdmin, setIsAdmin } = useUserPreferences();
 
   const [rooms, setRooms] = useState([]);
@@ -867,7 +867,7 @@ function App() {
   }, [isAdmin]);
 
   // Show global loading state for auth initialization
-  if (loading || redirectLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-100 flex items-center justify-center">
         <div className="text-center">
