@@ -50,7 +50,15 @@ export async function initiatePayment(orderData) {
   const CashfreeConstructor = await loadCashfreeSDK();
 
   // 2. Call Vercel Serverless Function to create the payment order
-  const response = await fetch('/api/create-order', {
+  // Use VITE_API_URL (set in Vercel env vars) or fall back to current origin
+  // This ensures the correct absolute URL is used on mobile and across origins
+  const API_BASE =
+    import.meta.env.VITE_API_URL ||
+    window.location.origin;
+
+  console.log('[API DEBUG]', `${API_BASE}/api/create-order`);
+
+  const response = await fetch(`${API_BASE}/api/create-order`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(orderData),
@@ -104,8 +112,15 @@ export async function initiatePayment(orderData) {
  * @returns {Promise<object>} - { status, roomId, ... }
  */
 export async function verifyPayment(orderId) {
+  // Use VITE_API_URL (set in Vercel env vars) or fall back to current origin
+  const API_BASE =
+    import.meta.env.VITE_API_URL ||
+    window.location.origin;
+
+  console.log('[API DEBUG]', `${API_BASE}/api/verify-payment?orderId=${encodeURIComponent(orderId)}`);
+
   const response = await fetch(
-    `/api/verify-payment?orderId=${encodeURIComponent(orderId)}`
+    `${API_BASE}/api/verify-payment?orderId=${encodeURIComponent(orderId)}`
   );
   if (!response.ok) {
     const errBody = await response.json().catch(() => ({}));
