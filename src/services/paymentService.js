@@ -90,9 +90,10 @@ export async function initiatePayment(orderData) {
   const { payment_session_id, order_id } = data;
 
   // 3. Determine environment (sandbox vs production)
-  // Hardcoded to sandbox for current testing setup
-  const cashfreeMode = 'sandbox';
-
+  const cashfreeMode = import.meta.env.VITE_CASHFREE_ENV === "production"
+    ? "production"
+    : "sandbox";
+  console.log("[paymentService] Cashfree mode:", cashfreeMode);
   // 4. Initialize Cashfree instance
   const cashfree = CashfreeConstructor({ mode: cashfreeMode });
 
