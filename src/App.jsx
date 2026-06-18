@@ -7,6 +7,7 @@ import RoomCard from './components/RoomCard.jsx';
 import InAppToast from './components/InAppToast.jsx';
 import LoginScreen from './components/LoginScreen.jsx';
 import ConfirmationModal from './components/ConfirmationModal.jsx';
+import AdminMetrics from './components/AdminMetrics.jsx';
 
 import { useLanguage } from './contexts/LanguageContext.jsx';
 import { useAuth } from './contexts/AuthContext.jsx';
@@ -112,6 +113,8 @@ function App() {
   const [roomToDelete, setRoomToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [roomToToggleHidden, setRoomToToggleHidden] = useState(null);
+  const [adminFilter, setAdminFilter] = useState('all');
+  const [authPendingAction, setAuthPendingAction] = useState(() => sessionStorage.getItem('nivasi_auth_action') || null);
 
   // Version log — runs once on mount; helps identify stale cached builds on mobile
   useEffect(() => {
@@ -233,8 +236,7 @@ function App() {
       const orderIdParam = urlParams.get('order_id');
 
       if (paymentStatusParam === 'check' && orderIdParam) {
-        console.log('[verify-payment redirect]');
-        console.log('orderId:', orderIdParam);
+
         // Clean URL immediately so refresh doesn't trigger verification again
         window.history.replaceState({}, document.title, window.location.pathname);
         
@@ -247,8 +249,7 @@ function App() {
 
         try {
           const result = await verifyPayment(orderIdParam);
-          console.log('[verify-payment redirect]');
-          console.log('response:', result);
+
 
           if (result.success) {
             setNotification({
@@ -413,6 +414,18 @@ function App() {
         }
       }
 
+      // Admin Filter
+      if (isAdmin && adminFilter !== 'all') {
+        const hasSub = room.subscriptionStatus !== undefined;
+        if (adminFilter === 'active') {
+          if (!hasSub || room.paymentStatus !== 'paid' || !isSubscriptionActive(room.subscriptionEnd)) return false;
+        } else if (adminFilter === 'pending') {
+          if (!hasSub || room.paymentStatus !== 'pending') return false;
+        } else if (adminFilter === 'expired') {
+          if (!hasSub || (room.paymentStatus !== 'expired' && !(room.paymentStatus === 'paid' && !isSubscriptionActive(room.subscriptionEnd)))) return false;
+        }
+      }
+
       // Gender filtering - only show rooms matching the selected gender
       let matchesGender = true;
       if (selectedGender) {
@@ -442,27 +455,58 @@ function App() {
 
       return matchesGender && matchesCategory && matchesSearch && matchesFeatures && matchesPrice;
     });
-  }, [rooms, selectedGender, category, search, featureFilters, roomMatchesCategory, maxPrice, isAdmin]);
+  }, [rooms, selectedGender, category, search, featureFilters, roomMatchesCategory, maxPrice, isAdmin, adminFilter]);
 
-  const handleShowAddForm = useCallback(() => {
-    if (isAdmin) {
-      setShowAddForm(true);
+  // AuthGuard Interceptor
+  const requireAuth = useCallback((actionStr, callback) => {
+    if (isAuthenticated) {
+      if (callback) callback();
     } else {
-      setShowAdminLogin(true);
+      sessionStorage.setItem('nivasi_auth_action', actionStr);
+      setAuthPendingAction(actionStr);
+    }
+  }, [isAuthenticated]);
+
+  const handleLoginSuccess = useCallback(() => {
+    const pending = sessionStorage.getItem('nivasi_auth_action');
+    if (pending) {
+      sessionStorage.removeItem('nivasi_auth_action');
+      setAuthPendingAction(null);
+      if (pending === 'add-room') {
+        if (isAdmin) {
+          setShowAddForm(true);
+        } else {
+          setShowAdminLogin(true);
+        }
+      }
+    } else {
+      setAuthPendingAction(null);
     }
   }, [isAdmin]);
 
-  const handleAdminLogin = useCallback(() => {
-    setIsAdmin(true);
-    setShowAdminLogin(false);
-    setShowAddForm(true);
-    setNotification({
-      message: 'You now have access to add, edit, and delete rooms.',
-      type: 'success',
-      isVisible: true,
-      title: 'Admin Mode Activated!'
+  const handleShowAddForm = useCallback(() => {
+    requireAuth('add-room', () => {
+      if (isAdmin) {
+        setShowAddForm(true);
+      } else {
+        setShowAdminLogin(true);
+      }
     });
-  }, [setIsAdmin]);
+  }, [isAdmin, requireAuth]);
+
+  const handleAdminLogin = useCallback(() => {
+    requireAuth('admin', () => {
+      setIsAdmin(true);
+      setShowAdminLogin(false);
+      setShowAddForm(true);
+      setNotification({
+        message: 'You now have access to add, edit, and delete rooms.',
+        type: 'success',
+        isVisible: true,
+        title: 'Admin Mode Activated!'
+      });
+    });
+  }, [setIsAdmin, requireAuth]);
 
   const handleAddRoom = useCallback(async (newRoom) => {
     try {
@@ -489,11 +533,14 @@ function App() {
     } catch (error) {
       console.error('Error adding room or initiating payment:', error);
       setShowAddForm(false);
+      
+      const isDuplicateError = error.message && error.message.includes('already active');
+      
       setNotification({
-        message: 'Failed to initiate payment: ' + error.message,
-        type: 'error',
+        message: isDuplicateError ? 'Your room subscription is already active.' : 'Failed to initiate payment: ' + error.message,
+        type: isDuplicateError ? 'info' : 'error',
         isVisible: true,
-        title: 'Payment Error'
+        title: isDuplicateError ? 'Subscription Active' : 'Payment Error'
       });
     }
   }, [user]);
@@ -516,11 +563,13 @@ function App() {
       });
     } catch (error) {
       console.error('Error renewing subscription:', error);
+      const isDuplicateError = error.message && error.message.includes('already active');
+      
       setNotification({
-        message: 'Failed to initiate renewal: ' + error.message,
-        type: 'error',
+        message: isDuplicateError ? 'Your room subscription is already active.' : 'Failed to initiate renewal: ' + error.message,
+        type: isDuplicateError ? 'info' : 'error',
         isVisible: true,
-        title: 'Renewal Error'
+        title: isDuplicateError ? 'Subscription Active' : 'Renewal Error'
       });
     }
   }, [user]);
@@ -817,47 +866,21 @@ function App() {
     }
   }, [isAdmin]);
 
-  // Show login screen if not authenticated
-  if (!isAuthenticated) {
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-
-    if (isIOS) {
-      try {
-        const storedUser = localStorage.getItem('nivasi_auth_user');
-        if (storedUser) {
-          if (loading || redirectLoading) {
-            return (
-              <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-100 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
-                  <p className="text-gray-600">Reconnecting...</p>
-                </div>
-              </div>
-            );
-          } else {
-            // Reconnection failed, clean up the stale storage
-            localStorage.removeItem('nivasi_auth_user');
-          }
-        }
-      } catch {
-        // Ignore storage access errors
-      }
-    }
-
-    if (loading || redirectLoading) {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-100 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
-            <p className="text-gray-600">
-              Completing sign-in...
-            </p>
-          </div>
+  // Show global loading state for auth initialization
+  if (loading || redirectLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
         </div>
-      );
-    }
+      </div>
+    );
+  }
 
-    return <LoginScreen onLoginSuccess={() => { }} />;
+  // If user is not authenticated, force login first
+  if (!isAuthenticated) {
+    return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
   }
 
   return (
@@ -1045,6 +1068,8 @@ function App() {
             </div>
           )}
 
+          {isAdmin && <AdminMetrics rooms={rooms} adminFilter={adminFilter} setAdminFilter={setAdminFilter} />}
+
           {activeSection === 'rooms' ? (
             <>
               {/* Loading State */}
@@ -1069,7 +1094,7 @@ function App() {
                       onEdit={() => setEditRoom(room)}
                       onDelete={() => handleRequestDeleteRoom(room)}
                       onToggleHidden={() => handleRequestToggleHidden(room)}
-                      onRenew={handleRenewRoomSubscription}
+                      onRenew={() => requireAuth('renew-room', () => handleRenewRoomSubscription(room))}
                       t={t}
                     />
                   ))}

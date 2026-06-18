@@ -164,7 +164,7 @@ const RoomCard = memo(({ room, onViewDetails, isAdmin, onEdit, onDelete, isFirst
             {room.paymentStatus === 'paid' && isSubscriptionActive(room.subscriptionEnd) && (
               isExpiringSoon(room.subscriptionEnd) ? (
                 <span className="bg-orange-100 text-orange-800 text-[10px] font-bold px-2 py-0.5 rounded border border-orange-300">
-                  Expiring in {getDaysUntilExpiry(room.subscriptionEnd)} days
+                  Subscription expires soon
                 </span>
               ) : (
                 <span className="bg-green-100 text-green-800 text-[10px] font-bold px-2 py-0.5 rounded border border-green-300">
@@ -172,9 +172,9 @@ const RoomCard = memo(({ room, onViewDetails, isAdmin, onEdit, onDelete, isFirst
                 </span>
               )
             )}
-            {room.paymentStatus === 'paid' && !isSubscriptionActive(room.subscriptionEnd) && (
+            {(room.paymentStatus === 'expired' || (room.paymentStatus === 'paid' && !isSubscriptionActive(room.subscriptionEnd))) && (
               <span className="bg-red-100 text-red-800 text-[10px] font-bold px-2 py-0.5 rounded border border-red-300">
-                Expired
+                Subscription expired
               </span>
             )}
           </div>
@@ -266,13 +266,13 @@ const RoomCard = memo(({ room, onViewDetails, isAdmin, onEdit, onDelete, isFirst
                 Pay Listing Subscription (₹{room.subscriptionAmount || 100})
               </Button>
             )}
-            {hasSubscription && room.paymentStatus === 'paid' && (!isSubscriptionActive(room.subscriptionEnd) || isExpiringSoon(room.subscriptionEnd)) && (
+            {(room.paymentStatus === 'expired' || (hasSubscription && room.paymentStatus === 'paid' && (!isSubscriptionActive(room.subscriptionEnd) || isExpiringSoon(room.subscriptionEnd)))) && (
               <Button
                 onClick={() => onRenew && onRenew(room)}
                 className="w-full flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm h-9 sm:h-10 bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 font-bold touch-manipulation active:scale-[0.98] transition-transform"
                 size="sm"
               >
-                {isSubscriptionActive(room.subscriptionEnd) ? 'Renew Subscription early' : 'Renew Subscription (Expired)'}
+                Renew Now
               </Button>
             )}
             <Button

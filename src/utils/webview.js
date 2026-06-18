@@ -7,6 +7,9 @@
 export const detectWebView = () => {
   const userAgent = navigator.userAgent.toLowerCase();
   
+  // Standalone PWA detection
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  
   // Common WebView identifiers
   const webViewPatterns = [
     'wv', // Android WebView
@@ -35,17 +38,19 @@ export const detectWebView = () => {
   
   // Additional checks for mobile browsers that might have issues
   const isMobile = /android|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
-  const isMobileSafari = /mobile.*safari/i.test(userAgent) && !/chrome/i.test(userAgent);
+  const isIOS = /iphone|ipad|ipod/.test(userAgent);
+  const isMobileSafari = isIOS && /safari/i.test(userAgent) && !/crios|fxios/i.test(userAgent); // specifically Safari on iOS
+  
+  const isWebView = isWebViewByUA || isReactNativeWebView || isWKWebView;
   
   return {
-    isWebView: isWebViewByUA || isReactNativeWebView || isWKWebView,
-    isReactNativeWebView,
-    isWKWebView,
-    isWebViewByUA,
-    isMobile,
+    isWebView,
+    isStandalone,
+    isIOS,
     isMobileSafari,
     userAgent: navigator.userAgent,
-    shouldUseRedirect: isWebViewByUA || isReactNativeWebView || isWKWebView || isMobileSafari
+    // ALWAYS use redirect on iOS, WebViews, and Installed PWAs
+    shouldUseRedirect: isIOS || isWebView || isStandalone
   };
 };
 
@@ -79,7 +84,8 @@ export const supportsPopupAuth = () => {
  */
 export const getAuthErrorMessage = (error) => {
   const detection = detectWebView();
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isIOS = detection.isIOS;
+  const errorCode = error?.code || 'unknown';
   
   if (error.message?.includes('disallowed_useragent') || 
       error.message?.includes('Use secure browsers')) {
@@ -92,33 +98,33 @@ export const getAuthErrorMessage = (error) => {
     return 'Google Sign-In requires a secure browser. Please try using a different browser or install the Nivasi Space app.';
   }
   
-  if (error.code === 'auth/popup-blocked') {
-    if (isIOS) {
-      return 'Popup authentication is not supported on iOS. You will be redirected to Safari for secure authentication.';
-    }
-    return 'Popup was blocked. Please allow popups for this site or use the app version.';
+  switch (errorCode) {
+    case 'auth/popup-blocked':
+      return isIOS 
+        ? 'Popup authentication is not supported on iOS. You will be redirected to Safari for secure authentication.'
+        : 'Popup was blocked. Please allow popups for this site.';
+    case 'auth/popup-closed-by-user':
+      return 'Sign-in popup was closed before completion. Please try again.';
+    case 'auth/unauthorized-domain':
+      return 'This domain is not authorized for Google sign-in. Please contact support.';
+    case 'auth/network-request-failed':
+      return isIOS 
+        ? 'Network error on iOS. Please check your connection and try again.'
+        : 'Network error. Please check your internet connection and try again.';
+    case 'auth/too-many-requests':
+      return 'Too many sign-in attempts. Please wait a moment and try again later.';
+    case 'auth/account-exists-with-different-credential':
+      return 'An account already exists with the same email address but different sign-in credentials.';
+    case 'auth/operation-not-supported-in-this-environment':
+      return 'This browser does not support popup authentication. Try opening in a standard browser.';
+    case 'auth/cancelled-popup-request':
+      return 'Only one popup request is allowed at one time. Please close other popups and try again.';
+    default:
+      if (isIOS && error.message?.includes('timeout')) {
+        return 'Authentication is taking longer than expected on iOS. Please try refreshing the page or opening in Safari.';
+      }
+      return error.message || 'Failed to sign in with Google. Please try again.';
   }
-  
-  if (error.code === 'auth/unauthorized-domain') {
-    return 'This domain is not authorized for Google sign-in. Please contact support.';
-  }
-  
-  if (error.code === 'auth/network-request-failed') {
-    if (isIOS) {
-      return 'Network error on iOS. Please check your connection and try again. If the issue persists, try opening in Safari.';
-    }
-    return 'Network error. Please check your connection and try again.';
-  }
-  
-  if (error.code === 'auth/too-many-requests') {
-    return 'Too many sign-in attempts. Please try again later.';
-  }
-  
-  if (isIOS && error.message?.includes('timeout')) {
-    return 'Authentication is taking longer than expected on iOS. Please try refreshing the page or opening in Safari.';
-  }
-  
-  return error.message || 'Failed to sign in with Google. Please try again.';
 };
 
 /**
@@ -128,7 +134,7 @@ export const getAuthErrorMessage = (error) => {
  */
 export const getAuthSolutionSuggestions = (error) => {
   const detection = detectWebView();
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isIOS = detection.isIOS;
   const suggestions = [];
   
   if (error.message?.includes('disallowed_useragent') || 

@@ -56,17 +56,18 @@ export async function initiatePayment(orderData) {
     import.meta.env.VITE_API_URL?.replace(/\/$/, '') ||
     window.location.origin;
 
-  // Verbose debug block — visible in DevTools on any device
-  console.log('[API DEBUG]');
-  console.log('ENV URL:', import.meta.env.VITE_API_URL);
-  console.log('Origin:', window.location.origin);
-  console.log('Final URL:', `${API_BASE}/api/create-order`);
+  console.log("[paymentService] API_BASE =", API_BASE);
+
+  if (import.meta.env.DEV && !import.meta.env.VITE_API_URL) {
+    console.warn(
+      "[paymentService] VITE_API_URL is not configured. Local payments will fail unless .env.local is created."
+    );
+  }
 
   const response = await fetch(`${API_BASE}/api/create-order`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Cache-Control': 'no-cache',   // prevent stale mobile cache returning wrong response
     },
     body: JSON.stringify(orderData),
   });
@@ -80,9 +81,6 @@ export async function initiatePayment(orderData) {
   // API returns snake_case keys: payment_session_id, order_id
   const data = await response.json();
 
-  // Debug log — helps diagnose payment_session_id issues in production
-  console.log('[paymentService] create-order response:', JSON.stringify(data));
-
   // Validate payment_session_id before opening checkout
   if (!data.payment_session_id) {
     console.error('[paymentService] Missing payment_session_id in response:', data);
@@ -94,10 +92,6 @@ export async function initiatePayment(orderData) {
   // 3. Determine environment (sandbox vs production)
   // Hardcoded to sandbox for current testing setup
   const cashfreeMode = 'sandbox';
-
-  console.log('[Cashfree Debug] Mode:', cashfreeMode);
-  console.log('[Cashfree Debug] Session:', payment_session_id);
-  console.log(`[paymentService] Opening Cashfree checkout in ${cashfreeMode} mode | order: ${order_id} | session: ${payment_session_id.substring(0, 20)}...`);
 
   // 4. Initialize Cashfree instance
   const cashfree = CashfreeConstructor({ mode: cashfreeMode });
@@ -124,15 +118,8 @@ export async function verifyPayment(orderId) {
     import.meta.env.VITE_API_URL?.replace(/\/$/, '') ||
     window.location.origin;
 
-  // Verbose debug block
-  console.log('[API DEBUG]');
-  console.log('ENV URL:', import.meta.env.VITE_API_URL);
-  console.log('Origin:', window.location.origin);
-  console.log('Final URL:', `${API_BASE}/api/verify-payment?orderId=${encodeURIComponent(orderId)}`);
-
   const response = await fetch(
-    `${API_BASE}/api/verify-payment?orderId=${encodeURIComponent(orderId)}`,
-    { headers: { 'Cache-Control': 'no-cache' } }  // defeat mobile HTTP cache
+    `${API_BASE}/api/verify-payment?orderId=${encodeURIComponent(orderId)}`
   );
   if (!response.ok) {
     const errBody = await response.json().catch(() => ({}));

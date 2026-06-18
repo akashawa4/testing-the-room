@@ -40,32 +40,11 @@ googleProvider.setCustomParameters({
 auth.useDeviceLanguage();
 auth.settings.appVerificationDisabledForTesting = false;
 
-// Set auth persistence based on environment using the WebView detection utility
-const detection = detectWebView();
-const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-
-// Initialize auth persistence asynchronously
-(async () => {
-  try {
-    // For iOS devices, always use local persistence to maintain auth state after redirect
-    if (isIOS) {
-      await setPersistence(auth, browserLocalPersistence);
-    } else if (detection.shouldUseRedirect) {
-      // For other WebView environments, use local persistence
-      await setPersistence(auth, browserLocalPersistence);
-    } else {
-      // For regular browsers, use local persistence
-      await setPersistence(auth, browserLocalPersistence);
-    }
-  } catch (error) {
-    // Fallback - try local persistence
-    try {
-      await setPersistence(auth, browserLocalPersistence);
-    } catch (fallbackError) {
-      // Silent fail - persistence error
-    }
-  }
-})();
+// Set auth persistence synchronously
+// Firebase natively persists the session automatically, but forcing it guarantees it survives across refreshes
+setPersistence(auth, browserLocalPersistence).catch((error) => {
+  console.warn('[Firebase] Failed to set strict local persistence:', error);
+});
 
 // getRedirectResult() can only be consumed once per page load.
 // React StrictMode mounts twice in dev — cache the promise at module scope.
@@ -78,9 +57,19 @@ export const consumeRedirectResult = () => {
   return redirectResultPromise;
 };
 
-// Analytics disabled due to permission issues
-// Can be re-enabled later when Firebase project is properly configured
-export const analytics = null;
+// Simple analytics wrapper
+export const analytics = {
+  logEvent: (eventName, eventParams = {}) => {
+    // Only log non-sensitive metadata
+    const safeParams = { ...eventParams };
+    delete safeParams.email;
+    delete safeParams.uid;
+    delete safeParams.token;
+    
+    console.log(`[Analytics] ${eventName}`, safeParams);
+    // In the future, this can be wired to actual Firebase Analytics
+  }
+};
 
 // Export the Firebase app instance
 export default app;

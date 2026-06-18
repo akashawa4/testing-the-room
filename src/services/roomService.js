@@ -1,6 +1,6 @@
 // Room Service - Firestore operations for rooms
 import { db, collection, doc, getDocs, addDoc, updateDoc, deleteDoc, serverTimestamp } from '../firebase.js';
-import { getSubscriptionAmount } from '../utils/subscriptionConfig.js';
+import { getSubscriptionAmount, isSubscriptionActive } from '../utils/subscriptionConfig.js';
 
 const ROOMS_COLLECTION = 'rooms';
 
@@ -26,10 +26,31 @@ export const fetchRooms = async () => {
 
         // Spread doc.data() first, then override id with the real Firestore document id.
         // This prevents any numeric/custom 'id' field inside doc.data() from overwriting docSnap.id.
-        const rooms = snapshot.docs.map(docSnap => ({
-            ...docSnap.data(),
-            id: docSnap.id
-        }));
+        const rooms = snapshot.docs.map(docSnap => {
+            const data = docSnap.data();
+            const id = docSnap.id;
+            
+            // Check for subscription expiry
+            if (data.subscriptionStatus === 'active' && !isSubscriptionActive(data.subscriptionEnd)) {
+                console.log(`[expiry-check] expired room: ${id}`);
+                console.log(`[expiry-check] room marked expired: ${data.title}`);
+                
+                // Non-blocking update to Firestore
+                const updateRef = doc(db, ROOMS_COLLECTION, id);
+                updateDoc(updateRef, {
+                    paymentStatus: 'expired',
+                    subscriptionStatus: 'expired',
+                    isPublished: false
+                }).catch(e => console.error('[expiry-check] Failed to update Firestore:', e));
+                
+                return { ...data, id, paymentStatus: 'expired', subscriptionStatus: 'expired', isPublished: false };
+            }
+            
+            return {
+                ...data,
+                id
+            };
+        });
 
         return rooms;
     } catch (error) {

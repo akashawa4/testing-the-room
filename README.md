@@ -144,6 +144,21 @@ college-room-rental/
 - Node.js (v16 or higher)
 - npm or pnpm
 
+### Local Development
+
+Create `.env.local`
+
+```env
+VITE_API_URL=https://testing-the-room.vercel.app
+```
+
+Then run:
+
+```bash
+npm install
+npm run dev
+```
+
 ### Installation
 
 1. **Install Dependencies**

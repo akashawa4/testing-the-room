@@ -110,6 +110,39 @@ export default async function handler(req, res) {
   // Safely normalize roomId (it is already validated as a non-empty string above)
   const normalizedRoomId = roomId.trim();
 
+  // ── Duplicate Payment Protection ───────────────────────────────────────────
+  if (admin.apps.length) {
+    try {
+      const roomDoc = await admin.firestore().collection('rooms').doc(normalizedRoomId).get();
+      if (roomDoc.exists) {
+        const roomData = roomDoc.data();
+        if (roomData.paymentStatus === 'paid' && roomData.subscriptionStatus === 'active' && roomData.subscriptionEnd) {
+          let endTimeMs;
+          if (roomData.subscriptionEnd._seconds) {
+            endTimeMs = roomData.subscriptionEnd._seconds * 1000;
+          } else if (roomData.subscriptionEnd.toDate) {
+            endTimeMs = roomData.subscriptionEnd.toDate().getTime();
+          } else if (typeof roomData.subscriptionEnd === 'number') {
+            endTimeMs = roomData.subscriptionEnd;
+          } else {
+            endTimeMs = new Date(roomData.subscriptionEnd).getTime();
+          }
+          
+          if (endTimeMs > Date.now()) {
+            console.warn(`[create-order] Room ${normalizedRoomId} already has an active subscription. Order creation blocked.`);
+            return res.status(409).json({ 
+              error: "Room subscription already active", 
+              subscriptionEnd: roomData.subscriptionEnd 
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[create-order] Error checking duplicate payment:', err);
+      // Fall through and allow order creation if Firestore check fails
+    }
+  }
+
   // ── Resolve amount from roomType (server-side — never trust client) ────────
   let amount;
   try {

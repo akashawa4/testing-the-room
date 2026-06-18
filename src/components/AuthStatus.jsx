@@ -1,49 +1,59 @@
 import { useAuth } from '../contexts/AuthContext.jsx';
-import { Loader2, CheckCircle, AlertCircle, User } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 const AuthStatus = () => {
-  const { user, loading, redirectLoading, authError, isAuthenticated } = useAuth();
+  const { loading, redirectLoading, authError, clearAuthError } = useAuth();
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    if (loading || redirectLoading || authError) {
+      setIsVisible(true);
+    }
+    
+    // Auto dismiss error after 5 seconds
+    let timeout;
+    if (authError) {
+      timeout = setTimeout(() => {
+        setIsVisible(false);
+        // Allow time for exit animation
+        setTimeout(clearAuthError, 300);
+      }, 5000);
+    }
+    
+    // Auto dismiss loading if it finishes and there is no error
+    if (!loading && !redirectLoading && !authError) {
+      setIsVisible(false);
+    }
+
+    return () => clearTimeout(timeout);
+  }, [loading, redirectLoading, authError, clearAuthError]);
+
+  if (!isVisible) return null;
 
   if (loading || redirectLoading) {
     return (
-      <div className="fixed top-4 right-4 bg-blue-50 border border-blue-200 rounded-lg p-3 shadow-lg z-50">
-        <div className="flex items-center gap-2">
-          <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-          <span className="text-sm text-blue-800">
-            {redirectLoading ? 'Processing authentication...' : 'Loading...'}
-          </span>
-        </div>
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-gray-900 text-white rounded-full px-4 py-2 shadow-xl z-50 flex items-center gap-2 text-sm font-medium transition-all animate-in fade-in slide-in-from-bottom-4">
+        <Loader2 className="w-4 h-4 animate-spin text-orange-400" />
+        <span>{redirectLoading ? 'Finishing sign in...' : 'Connecting...'}</span>
       </div>
     );
   }
 
   if (authError) {
     return (
-      <div className="fixed top-4 right-4 bg-red-50 border border-red-200 rounded-lg p-3 shadow-lg z-50">
-        <div className="flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-red-600" />
-          <span className="text-sm text-red-800">
-            Authentication error occurred
-          </span>
-        </div>
-      </div>
-    );
-  }
-
-  if (isAuthenticated && user) {
-    return (
-      <div className="fixed top-4 right-4 bg-green-50 border border-green-200 rounded-lg p-3 shadow-lg z-50">
-        <div className="flex items-center gap-2">
-          <CheckCircle className="w-4 h-4 text-green-600" />
-          <div className="text-sm">
-            <div className="text-green-800 font-medium">
-              Welcome, {user.displayName || user.email}
-            </div>
-            <div className="text-green-600 text-xs">
-              Successfully authenticated
-            </div>
-          </div>
-        </div>
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-red-600 text-white rounded-full px-4 py-2 shadow-xl z-50 flex items-center gap-2 text-sm font-medium transition-all animate-in fade-in slide-in-from-bottom-4">
+        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+        <span className="truncate max-w-[200px]">{authError.message || 'Authentication error'}</span>
+        <button 
+          onClick={() => {
+            setIsVisible(false);
+            setTimeout(clearAuthError, 300);
+          }}
+          className="ml-2 bg-white/20 hover:bg-white/30 rounded-full w-5 h-5 flex items-center justify-center transition-colors"
+        >
+          &times;
+        </button>
       </div>
     );
   }
