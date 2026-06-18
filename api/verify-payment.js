@@ -90,7 +90,8 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid payment mapping: missing roomId' });
     }
 
-    console.log(`[verify-payment] payment mapping: order ${orderId} -> room ${roomId}`);
+    console.log(`[verify-payment] payment document: found`);
+    console.log(`[verify-payment] roomId: ${roomId}`);
 
     const isPaid = data.order_status === 'PAID';
     console.log(`[verify-payment] Cashfree status: ${data.order_status}`);
@@ -121,19 +122,22 @@ export default async function handler(req, res) {
       };
 
       await roomRef.update(updatePayload);
-      console.log(`[verify-payment] updated room: ${roomId}`);
       
       // Update payment record
       await paymentRef.update({
         status: data.order_status,
-        verifiedAt: admin.firestore.FieldValue.serverTimestamp()
+        verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+        cashfreeStatus: data.order_status
       });
+
+      console.log(`[verify-payment] Firestore updated`);
       
       return res.status(200).json({
-        status: 'success',
-        message: 'Payment verified and subscription activated',
+        success: true,
         roomId,
-        room: { ...currentData, ...updatePayload }
+        orderId,
+        paymentStatus: 'paid',
+        subscriptionStatus: 'active'
       });
     } else {
       // Payment not successful (could be ACTIVE, FAILED, etc.)
@@ -143,19 +147,22 @@ export default async function handler(req, res) {
       };
 
       await roomRef.update(updatePayload);
-      console.log(`[verify-payment] updated room: ${roomId}`);
 
       // Update payment record
       await paymentRef.update({
         status: data.order_status,
-        verifiedAt: admin.firestore.FieldValue.serverTimestamp()
+        verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+        cashfreeStatus: data.order_status
       });
 
+      console.log(`[verify-payment] Firestore updated`);
+
       return res.status(200).json({
-        status: 'pending',
-        message: `Payment status is ${data.order_status}`,
-        orderStatus: data.order_status,
-        roomId
+        success: false,
+        roomId,
+        orderId,
+        paymentStatus: updatePayload.paymentStatus,
+        subscriptionStatus: 'pending'
       });
     }
   } catch (error) {

@@ -233,7 +233,8 @@ function App() {
       const orderIdParam = urlParams.get('order_id');
 
       if (paymentStatusParam === 'check' && orderIdParam) {
-        console.log(`[verify-payment redirect] orderId: ${orderIdParam}`);
+        console.log('[verify-payment redirect]');
+        console.log('orderId:', orderIdParam);
         // Clean URL immediately so refresh doesn't trigger verification again
         window.history.replaceState({}, document.title, window.location.pathname);
         
@@ -246,9 +247,10 @@ function App() {
 
         try {
           const result = await verifyPayment(orderIdParam);
-          console.log(`[verify-payment redirect] response:`, result);
+          console.log('[verify-payment redirect]');
+          console.log('response:', result);
 
-          if (result.status === 'success') {
+          if (result.success) {
             setNotification({
               message: 'Your subscription is now active! The listing is published and visible to students.',
               type: 'success',

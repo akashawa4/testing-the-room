@@ -88,7 +88,7 @@ export default async function handler(req, res) {
   const { roomId, roomType, customerName, customerEmail, customerPhone } = req.body ?? {};
 
   // Log roomId and its type for debugging
-  console.log('roomId:', roomId);
+  console.log('[create-order] roomId:', roomId);
   console.log('roomId type:', typeof roomId);
 
   if (!roomId) {
@@ -174,6 +174,7 @@ export default async function handler(req, res) {
     }
 
     console.log(`[create-order] Order created: ${order.order_id} | ₹${order.order_amount} | session: ${paymentSessionId.substring(0, 20)}...`);
+    console.log(`[create-order] orderId: ${order.order_id}`);
 
     try {
       const db = admin.firestore();
@@ -185,7 +186,7 @@ export default async function handler(req, res) {
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         paymentType: "room_subscription"
       });
-      console.log(`[create-order] Payment mapping saved to Firestore for order: ${order.order_id}`);
+      console.log(`[create-order] payment mapping stored`);
     } catch (dbError) {
       console.error('[create-order] Error saving payment mapping to Firestore:', dbError);
       return res.status(500).json({ error: 'Failed to create payment mapping in database' });

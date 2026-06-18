@@ -56,17 +56,7 @@ function isSignatureValid(rawBody, signature, timestamp, secret) {
   return expected === signature;
 }
 
-/**
- * Extracts the roomId embedded inside a Nivasi order ID.
- * Order ID format: order_<roomId>_<unixMs>
- */
-function extractRoomId(orderId) {
-  if (!orderId?.startsWith('order_')) return null;
-  const body           = orderId.slice('order_'.length); // "<roomId>_<timestamp>"
-  const lastUnderscore = body.lastIndexOf('_');
-  if (lastUnderscore <= 0) return null;
-  return body.substring(0, lastUnderscore); // "<roomId>"
-}
+
 
 // ─── Handler ─────────────────────────────────────────────────────────────────
 
@@ -117,7 +107,21 @@ export default async function handler(req, res) {
 
   const eventType = event?.type;
   const orderId   = event?.data?.order?.order_id;
-  const roomId    = extractRoomId(orderId);
+  
+  let roomId = null;
+  if (orderId) {
+    try {
+      const db = admin.firestore();
+      const paymentSnap = await db.collection('payments').doc(orderId).get();
+      if (paymentSnap.exists) {
+        roomId = paymentSnap.data().roomId;
+      } else {
+        console.warn(`[cashfree-webhook] Payment mapping not found for order: ${orderId}`);
+      }
+    } catch (err) {
+      console.error('[cashfree-webhook] Failed to get payment mapping:', err.message);
+    }
+  }
 
   console.log(`[cashfree-webhook] Event: ${eventType} | order: ${orderId} | room: ${roomId}`);
 
