@@ -69,22 +69,33 @@ export default async function handler(req, res) {
       return res.status(response.status).json({ error: data.message || 'Failed to verify payment with Cashfree' });
     }
 
-    // Extract roomId from orderId (format: order_roomId_timestamp)
-    // E.g., order_123456_17181920
-    const prefix = 'order_';
-    if (!orderId.startsWith(prefix)) {
-      return res.status(400).json({ error: 'Invalid order ID format' });
+    console.log(`[verify-payment] orderId: ${orderId}`);
+
+    const db = admin.firestore();
+    
+    // Get payment mapping from Firestore
+    const paymentRef = db.collection('payments').doc(orderId);
+    const paymentSnap = await paymentRef.get();
+    
+    if (!paymentSnap.exists) {
+      console.error(`[verify-payment] Payment mapping not found for orderId: ${orderId}`);
+      return res.status(404).json({ error: `Payment mapping not found for orderId: ${orderId}` });
     }
-    const lastUnderscore = orderId.lastIndexOf('_');
-    if (lastUnderscore <= prefix.length) {
-      return res.status(400).json({ error: 'Invalid order ID format' });
+    
+    const paymentData = paymentSnap.data();
+    const roomId = paymentData.roomId;
+    
+    if (!roomId) {
+      console.error(`[verify-payment] roomId missing in payment mapping for orderId: ${orderId}`);
+      return res.status(400).json({ error: 'Invalid payment mapping: missing roomId' });
     }
-    const roomId = orderId.substring(prefix.length, lastUnderscore);
+
+    console.log(`[verify-payment] payment mapping: order ${orderId} -> room ${roomId}`);
 
     const isPaid = data.order_status === 'PAID';
+    console.log(`[verify-payment] Cashfree status: ${data.order_status}`);
     
     // Connect to Firestore and update the room
-    const db = admin.firestore();
     const roomRef = db.collection('rooms').doc(roomId);
     const roomSnap = await roomRef.get();
 
@@ -110,6 +121,13 @@ export default async function handler(req, res) {
       };
 
       await roomRef.update(updatePayload);
+      console.log(`[verify-payment] updated room: ${roomId}`);
+      
+      // Update payment record
+      await paymentRef.update({
+        status: data.order_status,
+        verifiedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
       
       return res.status(200).json({
         status: 'success',
@@ -125,6 +143,13 @@ export default async function handler(req, res) {
       };
 
       await roomRef.update(updatePayload);
+      console.log(`[verify-payment] updated room: ${roomId}`);
+
+      // Update payment record
+      await paymentRef.update({
+        status: data.order_status,
+        verifiedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
 
       return res.status(200).json({
         status: 'pending',

@@ -6,6 +6,23 @@
 
 import { Cashfree } from 'cashfree-pg';
 import { getAmountForRoomType } from './_utils/pricing.js';
+import admin from 'firebase-admin';
+
+// Initialize Firebase Admin SDK
+if (!admin.apps.length) {
+  try {
+    const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
+    if (!serviceAccountJson) {
+      throw new Error('Missing FIREBASE_SERVICE_ACCOUNT environment variable');
+    }
+    const serviceAccount = JSON.parse(serviceAccountJson);
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+  } catch (error) {
+    console.error('Firebase Admin init error:', error);
+  }
+}
 
 // ─── SDK initialisation (module-level, runs once per cold start) ──────────────
 Cashfree.XClientId     = process.env.CASHFREE_CLIENT_ID;
@@ -157,6 +174,22 @@ export default async function handler(req, res) {
     }
 
     console.log(`[create-order] Order created: ${order.order_id} | ₹${order.order_amount} | session: ${paymentSessionId.substring(0, 20)}...`);
+
+    try {
+      const db = admin.firestore();
+      await db.collection('payments').doc(order.order_id).set({
+        orderId: order.order_id,
+        roomId: normalizedRoomId,
+        amount: order.order_amount,
+        status: "created",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        paymentType: "room_subscription"
+      });
+      console.log(`[create-order] Payment mapping saved to Firestore for order: ${order.order_id}`);
+    } catch (dbError) {
+      console.error('[create-order] Error saving payment mapping to Firestore:', dbError);
+      return res.status(500).json({ error: 'Failed to create payment mapping in database' });
+    }
 
     return res.status(200).json({
       payment_session_id: paymentSessionId,
