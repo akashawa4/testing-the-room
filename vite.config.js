@@ -2,6 +2,9 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
+import { readFileSync } from 'fs'
+
+const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'))
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -10,6 +13,10 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+  },
+  // Inject build-time constants — readable in frontend via import.meta.env
+  define: {
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify(pkg.version),
   },
   build: {
     rollupOptions: {
@@ -32,7 +39,9 @@ export default defineConfig({
     minify: 'terser',
     terserOptions: {
       compress: {
-        drop_console: true,
+        // IMPORTANT: do NOT drop console logs — they are needed for API
+        // debugging on mobile devices where DevTools access is limited.
+        // drop_console: true  <-- intentionally disabled
         drop_debugger: true
       }
     },

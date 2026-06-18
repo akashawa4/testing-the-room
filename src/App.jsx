@@ -113,6 +113,13 @@ function App() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [roomToToggleHidden, setRoomToToggleHidden] = useState(null);
 
+  // Version log — runs once on mount; helps identify stale cached builds on mobile
+  useEffect(() => {
+    console.log('APP VERSION:', import.meta.env.VITE_APP_VERSION || 'dev');
+    console.log('BUILD TIME:', new Date().toISOString());
+    console.log('API BASE (env):', import.meta.env.VITE_API_URL || '(not set — will use window.location.origin)');
+  }, []);
+
   // iOS Debug logging
   useEffect(() => {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);

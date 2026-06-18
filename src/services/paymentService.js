@@ -50,17 +50,24 @@ export async function initiatePayment(orderData) {
   const CashfreeConstructor = await loadCashfreeSDK();
 
   // 2. Call Vercel Serverless Function to create the payment order
-  // Use VITE_API_URL (set in Vercel env vars) or fall back to current origin
-  // This ensures the correct absolute URL is used on mobile and across origins
+  // Strip trailing slash from env var to avoid double-slash URLs
+  // Falls back to window.location.origin so mobile/preview builds always hit the right host
   const API_BASE =
-    import.meta.env.VITE_API_URL ||
+    import.meta.env.VITE_API_URL?.replace(/\/$/, '') ||
     window.location.origin;
 
-  console.log('[API DEBUG]', `${API_BASE}/api/create-order`);
+  // Verbose debug block — visible in DevTools on any device
+  console.log('[API DEBUG]');
+  console.log('ENV URL:', import.meta.env.VITE_API_URL);
+  console.log('Origin:', window.location.origin);
+  console.log('Final URL:', `${API_BASE}/api/create-order`);
 
   const response = await fetch(`${API_BASE}/api/create-order`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache',   // prevent stale mobile cache returning wrong response
+    },
     body: JSON.stringify(orderData),
   });
 
@@ -112,15 +119,20 @@ export async function initiatePayment(orderData) {
  * @returns {Promise<object>} - { status, roomId, ... }
  */
 export async function verifyPayment(orderId) {
-  // Use VITE_API_URL (set in Vercel env vars) or fall back to current origin
+  // Strip trailing slash from env var; fall back to current origin
   const API_BASE =
-    import.meta.env.VITE_API_URL ||
+    import.meta.env.VITE_API_URL?.replace(/\/$/, '') ||
     window.location.origin;
 
-  console.log('[API DEBUG]', `${API_BASE}/api/verify-payment?orderId=${encodeURIComponent(orderId)}`);
+  // Verbose debug block
+  console.log('[API DEBUG]');
+  console.log('ENV URL:', import.meta.env.VITE_API_URL);
+  console.log('Origin:', window.location.origin);
+  console.log('Final URL:', `${API_BASE}/api/verify-payment?orderId=${encodeURIComponent(orderId)}`);
 
   const response = await fetch(
-    `${API_BASE}/api/verify-payment?orderId=${encodeURIComponent(orderId)}`
+    `${API_BASE}/api/verify-payment?orderId=${encodeURIComponent(orderId)}`,
+    { headers: { 'Cache-Control': 'no-cache' } }  // defeat mobile HTTP cache
   );
   if (!response.ok) {
     const errBody = await response.json().catch(() => ({}));
