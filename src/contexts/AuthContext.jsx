@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { auth, signOut, consumeRedirectResult, googleProvider, signInWithPopup, signInWithRedirect } from '../firebase.js';
+import { auth, signOut, consumeRedirectResult, googleProvider, signInWithPopup, signInWithRedirect, setPersistence, browserLocalPersistence } from '../firebase.js';
 import { onIdTokenChanged } from 'firebase/auth';
 
 const AuthContext = createContext();
@@ -21,7 +21,18 @@ const shouldForceRedirect = () => {
   const isInAppBrowser =
     /FBAN|FBAV|Instagram|Line|MicroMessenger|WhatsApp|Telegram|wv/i.test(ua);
 
-  return isIOS || isStandalone || isInAppBrowser;
+  const isMobileSafari = isSafari && /Mobile|iPhone|iPad|iPod/i.test(ua);
+
+  const forceRedirect = isIOS || isStandalone || isInAppBrowser || isMobileSafari;
+
+  console.log("[auth] hostname:", window.location.hostname);
+  console.log("[auth] isIOS:", isIOS);
+  console.log("[auth] isStandalone:", isStandalone);
+  console.log("[auth] isInAppBrowser:", isInAppBrowser);
+  console.log("[auth] isMobileSafari:", isMobileSafari);
+  console.log("[auth] forceRedirect:", forceRedirect);
+
+  return forceRedirect;
 };
 
 export const useAuth = () => {
@@ -125,10 +136,11 @@ export const AuthProvider = ({ children }) => {
       throw new Error("No internet connection");
     }
 
+    await setPersistence(auth, browserLocalPersistence);
+
     const forceRedirect = shouldForceRedirect();
 
     console.log("[auth] userAgent:", navigator.userAgent);
-    console.log("[auth] forceRedirect:", forceRedirect);
 
     if (forceRedirect) {
       setLoading(true);
