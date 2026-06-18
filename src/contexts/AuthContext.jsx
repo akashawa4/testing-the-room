@@ -1,46 +1,42 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { auth, signOut, consumeRedirectResult, googleProvider, signInWithPopup, signInWithRedirect, setPersistence, browserLocalPersistence } from '../firebase.js';
+import {
+  auth,
+  signOut,
+  consumeRedirectResult,
+  googleProvider,
+  signInWithPopup,
+  signInWithRedirect,
+  setPersistence,
+  browserLocalPersistence
+} from '../firebase.js';
+
 import { onIdTokenChanged } from 'firebase/auth';
 
 const AuthContext = createContext();
 
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
+  return context;
+};
+
+/* -------------------- iOS SAFE DETECTION -------------------- */
 const shouldForceRedirect = () => {
   const ua = navigator.userAgent || "";
   const platform = navigator.platform || "";
+
   const isIOS =
     /iPad|iPhone|iPod/i.test(ua) ||
     (platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
-  const isSafari =
-    /^((?!chrome|android).)*safari/i.test(ua);
-
-  const isStandalone =
-    window.matchMedia?.("(display-mode: standalone)")?.matches ||
-    window.navigator.standalone === true;
-
   const isInAppBrowser =
     /FBAN|FBAV|Instagram|Line|MicroMessenger|WhatsApp|Telegram|wv/i.test(ua);
 
+  const isSafari = /^((?!chrome|android).)*safari/i.test(ua);
+
   const isMobileSafari = isSafari && /Mobile|iPhone|iPad|iPod/i.test(ua);
 
-  const forceRedirect = isIOS || isStandalone || isInAppBrowser || isMobileSafari;
-
-  console.log("[auth] hostname:", window.location.hostname);
-  console.log("[auth] isIOS:", isIOS);
-  console.log("[auth] isStandalone:", isStandalone);
-  console.log("[auth] isInAppBrowser:", isInAppBrowser);
-  console.log("[auth] isMobileSafari:", isMobileSafari);
-  console.log("[auth] forceRedirect:", forceRedirect);
-
-  return forceRedirect;
-};
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  return isIOS || isInAppBrowser || isMobileSafari;
 };
 
 export const AuthProvider = ({ children }) => {
@@ -50,117 +46,84 @@ export const AuthProvider = ({ children }) => {
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
   useEffect(() => {
-    // Track network status for offline guard
     const handleOnline = () => setIsOffline(false);
     const handleOffline = () => setIsOffline(true);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
 
-    let isMounted = true;
-    let redirectFinished = false;
-    let tokenFired = false;
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
 
-    const checkLoading = () => {
-      if (isMounted && redirectFinished && tokenFired) {
+    let mounted = true;
+    let redirectDone = false;
+    let tokenDone = false;
+
+    const finishLoading = () => {
+      if (mounted && redirectDone && tokenDone) {
         setLoading(false);
       }
     };
 
-    // 1. Check for redirect results ONCE
+    /* -------------------- REDIRECT HANDLING (LIKE PROJECT 2) -------------------- */
     consumeRedirectResult()
       .then((result) => {
-        console.log("[auth] redirect result:", result ? "received" : "none");
+        console.log("[auth] redirect result:", result ? "SUCCESS" : "NONE");
       })
-      .catch((error) => {
-        console.error("[auth] redirect result error:", error?.code, error?.message);
-        if (error?.code !== 'auth/credential-already-in-use') {
-          setAuthError(error);
+      .catch((err) => {
+        console.error("[auth] redirect error:", err?.code, err?.message);
+        if (err?.code !== "auth/credential-already-in-use") {
+          setAuthError(err);
         }
       })
       .finally(() => {
-        redirectFinished = true;
-        checkLoading();
+        redirectDone = true;
+        finishLoading();
       });
 
-    // 2. Trust Firebase strictly. onIdTokenChanged handles initial load, sign-in, sign-out, AND token refreshes!
-    const authUnsubscribe = onIdTokenChanged(
-      auth,
-      async (firebaseUser) => {
-        if (!isMounted) return;
-        
-        if (firebaseUser) {
-          // Token refreshed or authenticated
-          setUser(firebaseUser);
-          setAuthError(null);
-        } else {
-          setUser(null);
-        }
-        
-        tokenFired = true;
-        checkLoading();
-      },
-      (error) => {
-        if (isMounted) {
-          console.error('[AuthContext] onIdTokenChanged error:', error);
-          setAuthError(error);
-          tokenFired = true;
-          checkLoading();
-        }
-      }
-    );
+    /* -------------------- TOKEN LISTENER (SOURCE OF TRUTH) -------------------- */
+    const unsub = onIdTokenChanged(auth, (firebaseUser) => {
+      if (!mounted) return;
+
+      setUser(firebaseUser || null);
+      setAuthError(null);
+
+      tokenDone = true;
+      finishLoading();
+    });
 
     return () => {
-      isMounted = false;
-      authUnsubscribe();
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      mounted = false;
+      unsub();
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
     };
   }, []);
 
-  const logout = async () => {
-    try {
-      await signOut(auth);
-      setUser(null);
-      setAuthError(null);
-    } catch (error) {
-      setAuthError(error);
-    }
-  };
-
-  // Centralized Google login logic
+  /* -------------------- LOGIN (CLEAN PROJECT 2 STYLE) -------------------- */
   const loginWithGoogle = async () => {
-    clearAuthError();
     setAuthError(null);
 
-    if (isOffline) {
-      throw new Error("No internet connection");
-    }
+    if (isOffline) throw new Error("No internet connection");
 
     await setPersistence(auth, browserLocalPersistence);
 
     const forceRedirect = shouldForceRedirect();
 
-    console.log("[auth] userAgent:", navigator.userAgent);
-
-    if (forceRedirect) {
-      setLoading(true);
-      console.log("[auth] starting redirect sign-in");
-      await signInWithRedirect(auth, googleProvider);
-      return { method: "redirect" };
-    }
-
     try {
-      console.log("[auth] starting popup sign-in");
+      if (forceRedirect) {
+        setLoading(true);
+        await signInWithRedirect(auth, googleProvider);
+        return { method: "redirect" };
+      }
+
       await signInWithPopup(auth, googleProvider);
       return { method: "popup" };
+
     } catch (err) {
-      console.warn("[auth] popup failed, fallback redirect:", err?.code);
+      console.warn("[auth] popup failed:", err?.code);
 
       if (
         err?.code === "auth/popup-blocked" ||
         err?.code === "auth/popup-closed-by-user" ||
-        err?.code === "auth/cancelled-popup-request" ||
-        err?.code === "auth/operation-not-supported-in-this-environment"
+        err?.code === "auth/cancelled-popup-request"
       ) {
         setLoading(true);
         await signInWithRedirect(auth, googleProvider);
@@ -172,23 +135,26 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const clearAuthError = () => {
-    setAuthError(null);
+  const logout = async () => {
+    await signOut(auth);
+    setUser(null);
   };
 
-  const value = {
-    user,
-    loading,
-    logout,
-    loginWithGoogle,
-    isAuthenticated: !!user,
-    authError,
-    clearAuthError,
-    isOffline,
-  };
+  const clearAuthError = () => setAuthError(null);
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        authError,
+        isOffline,
+        isAuthenticated: !!user,
+        loginWithGoogle,
+        logout,
+        clearAuthError
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

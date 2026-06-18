@@ -48,10 +48,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
     clearAuthError();
 
     try {
-      const result = await loginWithGoogle();
-      if (result?.method !== "redirect") {
-        setIsLoading(false);
-      }
+      await loginWithGoogle();
     } catch (err) {
       console.error('[LoginScreen] Sign-in error:', err);
       setError(getAuthErrorMessage(err));
@@ -146,7 +143,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
           <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-blue-700 text-xs text-center">
               {isIOS
-                ? 'On iPhone, Google sign-in opens in a secure redirect. Please complete login and return to Nivasi.'
+                ? 'On iPhone and Safari, Google login uses a secure redirect for better compatibility. Please complete the sign-in process and return to the app.'
                 : 'You will be redirected to Google for secure authentication'}
             </p>
           </div>
