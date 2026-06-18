@@ -87,13 +87,17 @@ export default async function handler(req, res) {
   // ── Parse & validate body ──────────────────────────────────────────────────
   const { roomId, roomType, customerName, customerEmail, customerPhone } = req.body ?? {};
 
-  // Log roomId and its type for debugging
-  console.log('[create-order] roomId:', roomId);
-  console.log('roomId type:', typeof roomId);
+  // Log full request body for debugging
+  console.log('[create-order] request body:', JSON.stringify(req.body));
+  console.log('[create-order] received roomId:', roomId);
 
-  if (!roomId) {
+  // Strict validation: roomId MUST be a Firestore-generated document id (alphanumeric string,
+  // NOT a numeric timestamp like 1781760033930 and NOT starting with '178...).
+  if (!roomId || typeof roomId !== 'string' || roomId.startsWith('178') || /^\d+$/.test(roomId)) {
+    console.error('[create-order] Invalid roomId received:', roomId);
     return res.status(400).json({
-      error: 'Missing roomId',
+      error: 'Invalid roomId. Must be Firestore rooms document id.',
+      receivedRoomId: roomId
     });
   }
 
@@ -103,17 +107,8 @@ export default async function handler(req, res) {
     });
   }
 
-  // Safely normalize roomId
-  let normalizedRoomId = '';
-  if (typeof roomId === 'string') {
-    normalizedRoomId = roomId;
-  } else if (typeof roomId === 'number') {
-    normalizedRoomId = String(roomId);
-  } else if (roomId && typeof roomId === 'object') {
-    normalizedRoomId = typeof roomId.id === 'string' ? roomId.id : (roomId.id ? String(roomId.id) : String(roomId));
-  } else {
-    normalizedRoomId = String(roomId);
-  }
+  // Safely normalize roomId (it is already validated as a non-empty string above)
+  const normalizedRoomId = roomId.trim();
 
   // ── Resolve amount from roomType (server-side — never trust client) ────────
   let amount;
@@ -178,6 +173,7 @@ export default async function handler(req, res) {
 
     try {
       const db = admin.firestore();
+      console.log('[create-order] stored payment roomId:', normalizedRoomId);
       await db.collection('payments').doc(order.order_id).set({
         orderId: order.order_id,
         roomId: normalizedRoomId,

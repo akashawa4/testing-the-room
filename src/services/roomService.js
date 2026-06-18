@@ -24,11 +24,11 @@ export const fetchRooms = async () => {
         const roomsRef = collection(db, ROOMS_COLLECTION);
         const snapshot = await getDocs(roomsRef);
 
-        // Return all rooms without deduplication
-        // Each room in Firestore has a unique document ID, so we trust that
+        // Spread doc.data() first, then override id with the real Firestore document id.
+        // This prevents any numeric/custom 'id' field inside doc.data() from overwriting docSnap.id.
         const rooms = snapshot.docs.map(docSnap => ({
-            id: docSnap.id,
-            ...docSnap.data()
+            ...docSnap.data(),
+            id: docSnap.id
         }));
 
         return rooms;
@@ -74,10 +74,12 @@ export const addRoom = async (roomData) => {
 
         const docRef = await addDoc(roomsRef, roomToAdd);
 
+        // Spread roomData and subscriptionFields first, then override id with the real
+        // Firestore-generated document id so no custom/numeric id field can overwrite it.
         return {
-            id: docRef.id,
             ...roomData,
-            ...subscriptionFields
+            ...subscriptionFields,
+            id: docRef.id
         };
     } catch (error) {
         console.error('Error adding room to Firestore:', error);
