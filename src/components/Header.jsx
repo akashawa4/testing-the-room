@@ -25,8 +25,8 @@ const Header = ({
                 {/* Mobile Layout - Optimized */}
                 <div className="sm:hidden">
                     {/* Top Row - Logo, Title, Profile */}
-                    <div className="flex items-center justify-between mb-3 px-1">
-                        <Link to="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity min-w-0">
+                    <div className="flex items-center justify-between mb-2 px-1">
+                        <Link to="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity min-w-0 flex-1 mr-2">
                             <Logo className="h-7 w-auto bg-white/20 backdrop-blur-sm rounded-lg flex-shrink-0" />
                             <div className="flex flex-col min-w-0">
                                 <h1 className="text-sm font-bold text-white leading-tight truncate">
@@ -37,48 +37,51 @@ const Header = ({
                                 </p>
                             </div>
                         </Link>
+                        {/* Profile button: relative + z-50 to sit above ::before overlay */}
                         <Button
                             onClick={() => navigate('/profile')}
                             variant="ghost"
                             size="sm"
-                            className="p-1 h-8 w-8 text-white hover:bg-white/20 rounded-full flex-shrink-0"
+                            className="relative z-50 p-0 h-9 w-9 min-h-0 text-white hover:bg-white/20 rounded-full flex-shrink-0 flex items-center justify-center"
+                            style={{ minHeight: 'unset' }}
                         >
                             <User className="w-5 h-5" />
                         </Button>
                     </div>
 
-                    {/* Horizontal Scrollable Actions */}
-                    <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 px-1 -mx-1 mask-scroll-fade">
+                    {/* 2×2 Grid Actions — mobile only, no scroll */}
+                    <div className="grid grid-cols-2 gap-2">
+                        {/* Location */}
                         <Button
                             onClick={onChangeLocation}
                             variant="outline"
-                            size="sm"
-                            className="flex-shrink-0 bg-white/20 border-white/30 text-white hover:bg-white/30 backdrop-blur-sm text-[11px] h-8 px-3 rounded-full"
+                            className="w-full bg-white/20 border-white/30 text-white hover:bg-white/30 backdrop-blur-sm text-xs min-h-[44px] px-3 rounded-xl flex items-center justify-center gap-1.5"
                         >
-                            <MapPin className="w-3.5 h-3.5 mr-1.5" />
-                            <span className="truncate max-w-[100px]">{selectedLocation ? selectedLocation.city : 'Location'}</span>
+                            <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                            <span className="truncate">{selectedLocation ? selectedLocation.city : 'City'}</span>
                         </Button>
 
+                        {/* Gender */}
                         <Button
                             onClick={onChangeGender}
                             variant="outline"
-                            size="sm"
-                            className="flex-shrink-0 bg-white/20 border-white/30 text-white hover:bg-white/30 backdrop-blur-sm text-[11px] h-8 px-3 rounded-full"
+                            className="w-full bg-white/20 border-white/30 text-white hover:bg-white/30 backdrop-blur-sm text-xs min-h-[44px] px-3 rounded-xl flex items-center justify-center gap-1.5"
                         >
-                            <User className="w-3.5 h-3.5 mr-1.5" />
-                            <span>{selectedGender ? (selectedGender === 'boy' ? 'Boy' : 'Girl') : 'Gender'}</span>
+                            <User className="w-3.5 h-3.5 flex-shrink-0" />
+                            <span className="truncate">{selectedGender ? (selectedGender === 'boy' ? 'Boy' : 'Girl') : 'Gender'}</span>
                         </Button>
 
-                        <div className="flex-shrink-0 h-8 [&>div]:h-full [&>div>button]:h-full [&>div>button]:text-[11px] [&>div>button]:bg-white/20 [&>div>button]:border-white/30 [&>div>button]:text-white [&>div>button]:rounded-full [&>div>button]:px-3">
+                        {/* Language */}
+                        <div className="w-full [&>div]:w-full [&>div>button]:w-full [&>div>button]:min-h-[44px] [&>div>button]:text-xs [&>div>button]:bg-white/20 [&>div>button]:border-white/30 [&>div>button]:text-white [&>div>button]:rounded-xl [&>div>button]:px-3 [&>div>button]:justify-center">
                             <LanguageSelector />
                         </div>
 
+                        {/* Contact */}
                         <Button
                             onClick={onContactUs}
-                            size="sm"
-                            className="flex-shrink-0 btn-primary hover-lift h-8 text-[11px] px-3 rounded-full"
+                            className="w-full btn-primary hover-lift text-xs min-h-[44px] px-3 rounded-xl flex items-center justify-center gap-1.5"
                         >
-                            <Phone className="w-3.5 h-3.5 mr-1.5" />
+                            <Phone className="w-3.5 h-3.5 flex-shrink-0" />
                             <span>Contact</span>
                         </Button>
                     </div>
@@ -107,7 +110,7 @@ const Header = ({
                             className="w-full sm:w-auto bg-white/20 border-white/30 text-white hover:bg-white/30 backdrop-blur-sm"
                         >
                             <Settings className="w-4 h-4 mr-2" />
-                            {selectedLocation ? 'Change Location' : 'Location'}
+                            {selectedLocation ? 'Change City' : 'City'}
                         </Button>
                         <Button
                             onClick={onChangeGender}

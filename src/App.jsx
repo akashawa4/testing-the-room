@@ -908,48 +908,49 @@ function App() {
             />
           </div>
 
-          <div className="flex gap-3 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 no-scrollbar items-center justify-between md:justify-end">
-            {/* Section Tabs */}
-            <div className="bg-gray-100 p-1 rounded-lg flex flex-shrink-0">
+          <div className="flex flex-col md:flex-row gap-2 md:gap-3 w-full md:w-auto items-center justify-between md:justify-end">
+            {/* Section Tabs - Row 1 on Mobile */}
+            <div className="bg-gray-100 p-1 rounded-lg flex w-full md:w-auto md:flex-shrink-0">
               <button
                 onClick={() => setActiveSection('rooms')}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-md transition-all text-sm font-medium ${activeSection === 'rooms'
+                className={`flex-1 flex justify-center items-center gap-2 px-3 py-1.5 rounded-md transition-all text-sm font-medium min-h-[44px] md:min-h-0 ${activeSection === 'rooms'
                   ? 'bg-white text-orange-600 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900'
                   }`}
               >
-                <Home className="w-4 h-4" />
-                Rooms
+                <Home className="w-4 h-4 shrink-0" />
+                <span className="whitespace-nowrap">Rooms</span>
               </button>
               <button
                 onClick={() => setActiveSection('mess')}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-md transition-all text-sm font-medium ${activeSection === 'mess'
+                className={`flex-1 flex justify-center items-center gap-2 px-3 py-1.5 rounded-md transition-all text-sm font-medium min-h-[44px] md:min-h-0 ${activeSection === 'mess'
                   ? 'bg-white text-orange-600 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900'
                   }`}
               >
-                <Utensils className="w-4 h-4" />
-                Mess
+                <Utensils className="w-4 h-4 shrink-0" />
+                <span className="whitespace-nowrap">Mess</span>
               </button>
             </div>
 
-            <div className="flex gap-2">
+            {/* Actions - Row 2 on Mobile */}
+            <div className="grid grid-cols-2 gap-2 w-full md:w-auto md:flex md:gap-2">
               <Button
                 onClick={() => setShowFeatureFilter(true)}
                 variant="outline"
                 size="sm"
-                className={`bg-white lg:hidden ${Object.keys(featureFilters).length > 0 || maxPrice < 10000 ? 'border-orange-500 text-orange-600' : ''}`}
+                className={`w-full md:w-auto flex justify-center items-center min-h-[44px] md:min-h-0 text-sm px-3 bg-white lg:hidden ${Object.keys(featureFilters).length > 0 || maxPrice < 10000 ? 'border-orange-500 text-orange-600' : ''}`}
               >
-                <Filter className="w-4 h-4 mr-2" />
-                Filters
+                <Filter className="w-4 h-4 mr-2 shrink-0" />
+                <span className="whitespace-nowrap">Filters</span>
               </Button>
               <Button
                 onClick={handleShowAddForm}
                 size="sm"
-                className="bg-orange-600 hover:bg-orange-700 text-white whitespace-nowrap text-xs sm:text-sm"
+                className="w-full md:w-auto min-h-[44px] md:min-h-0 px-4 bg-orange-600 hover:bg-orange-700 text-white whitespace-nowrap text-sm"
               >
                 <span className="hidden sm:inline">+ {t('addRoom')}</span>
-                <span className="sm:hidden">+ Add</span>
+                <span className="sm:hidden">+ Add Room</span>
               </Button>
             </div>
           </div>

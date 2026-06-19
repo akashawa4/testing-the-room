@@ -191,6 +191,11 @@
   .fixed.inset-0 {
     overscroll-behavior: contain;
   }
+
+  /* Override min-height for compact header action buttons on mobile */
+  header button {
+    min-height: unset !important;
+  }
 }
 
 /* Hide scrollbar on mobile for cleaner look */
@@ -199,6 +204,16 @@
 }
 
 .scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Alias for no-scrollbar (same as scrollbar-hide) */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
@@ -256,6 +271,8 @@ button,
   bottom: 0;
   background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
   animation: float 20s ease-in-out infinite;
+  /* Prevent this decorative overlay from blocking pointer events */
+  pointer-events: none;
 }
 
 @keyframes float {

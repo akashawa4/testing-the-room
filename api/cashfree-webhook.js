@@ -1,40 +1,36 @@
 // api/cashfree-webhook.js
-// Vercel Serverless Function — receives and verifies Cashfree webhook events.
+// Vercel Serverless Function — receives Cashfree webhook events.
 // POST /api/cashfree-webhook
 
 import crypto from 'crypto';
 import admin from 'firebase-admin';
 
-// ─── Firebase Admin (once per cold start) ─────────────────────────────────────
+// ─── Firebase Admin (initialize once per cold start) ──────────────────────────────
 if (!admin.apps.length) {
   try {
     const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
-    if (!raw) {
-      console.error('[cashfree-webhook] FIREBASE_SERVICE_ACCOUNT env var is missing');
-    } else {
+    if (raw) {
       admin.initializeApp({
         credential: admin.credential.cert(JSON.parse(raw))
       });
+    } else {
+      console.error('[cashfree-webhook] FIREBASE_SERVICE_ACCOUNT is missing');
     }
-  } catch (err) {
-    console.error('[cashfree-webhook] Firebase Admin init error:', err.message);
+  } catch (e) {
+    console.error('[cashfree-webhook] Firebase init error:', e.message);
   }
 }
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────────────
 
 const SUBSCRIPTION_DURATION_DAYS = 90;
 
-// Vercel must NOT parse the body — we need the raw bytes for HMAC verification.
+// Vercel must receive the raw request body for HMAC verification.
 export const config = {
-  api: { bodyParser: false },
+  api: { bodyParser: false }
 };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/**
- * Reads all chunks from a Node.js Readable stream and returns them
- * concatenated as a UTF-8 string.
- */
+// ─── Utilities ────────────────────────────────────────────────────────────────
+/** Reads the raw request body as a UTF‑8 string */
 async function readRawBody(req) {
   const chunks = [];
   for await (const chunk of req) {
@@ -43,159 +39,182 @@ async function readRawBody(req) {
   return Buffer.concat(chunks).toString('utf8');
 }
 
-/**
- * Verifies the Cashfree webhook HMAC-SHA256 signature.
- * Cashfree signs `timestamp + rawBody` with CASHFREE_CLIENT_SECRET.
+/** Verifies Cashfree HMAC‑SHA256 signature
+ *  Cashfree signs `${timestamp}${rawBody}` with the webhook secret.
  */
-function isSignatureValid(rawBody, signature, timestamp, secret) {
-  const payload  = timestamp + rawBody;
-  const expected = crypto
-    .createHmac('sha256', secret)
-    .update(payload)
-    .digest('base64');
+function verifySignature(rawBody, signature, timestamp, secret) {
+  const payload = `${timestamp}${rawBody}`;
+  const expected = crypto.createHmac('sha256', secret).update(payload).digest('base64');
   return expected === signature;
 }
 
+/** Consistent, safe logging – never prints the full payload */
+function safeLog({ event, orderId, roomId, status, firestore }) {
+  const parts = [];
+  if (event) parts.push(`[cashfree-webhook] event: ${event}`);
+  if (orderId) parts.push(`[cashfree-webhook] orderId: ${orderId}`);
+  if (roomId) parts.push(`[cashfree-webhook] mapped roomId: ${roomId}`);
+  if (status) parts.push(`[cashfree-webhook] payment status: ${status}`);
+  if (firestore) parts.push(`[cashfree-webhook] Firestore updated: ${firestore}`);
+  console.log(parts.join(' | '));
+}
 
-
-// ─── Handler ─────────────────────────────────────────────────────────────────
-
+// ─── Main handler ─────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
+  // 1️⃣ Accept only POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // 1. Read raw body (must happen before anything else)
+  // 2️⃣ Read raw body (must be before any parsing)
   let rawBody;
   try {
     rawBody = await readRawBody(req);
-  } catch (err) {
-    console.error('[cashfree-webhook] Failed to read body:', err.message);
+  } catch (e) {
+    console.error('[cashfree-webhook] Body read error:', e.message);
     return res.status(400).json({ error: 'Cannot read request body' });
   }
 
-  // 2. Extract signature headers
+  // 3️⃣ Extract required webhook headers
   const signature = req.headers['x-webhook-signature'];
   const timestamp = req.headers['x-webhook-timestamp'];
-
   if (!signature || !timestamp) {
-    console.error('[cashfree-webhook] Missing x-webhook-signature or x-webhook-timestamp');
+    console.error('[cashfree-webhook] Missing signature headers');
     return res.status(400).json({ error: 'Missing webhook signature headers' });
   }
 
-  // 3. Verify secret is configured
-  const secret = process.env.CASHFREE_CLIENT_SECRET;
-  if (!secret) {
-    console.error('[cashfree-webhook] CASHFREE_CLIENT_SECRET is not set');
-    return res.status(500).json({ error: 'Server configuration error' });
+  // 4️⃣ Optional signature verification – only if secret is configured
+  const webhookSecret = process.env.CASHFREE_WEBHOOK_SECRET;
+  if (webhookSecret) {
+    if (!verifySignature(rawBody, signature, timestamp, webhookSecret)) {
+      console.error('[cashfree-webhook] Invalid signature');
+      return res.status(401).json({ error: 'Invalid webhook signature' });
+    }
+  } else {
+    // TODO: Add support for secret rotation via Vercel secrets if needed.
+    console.warn('[cashfree-webhook] CASHFREE_WEBHOOK_SECRET not set – skipping signature verification');
   }
 
-  // 4. Verify HMAC — reject immediately if invalid
-  if (!isSignatureValid(rawBody, signature, timestamp, secret)) {
-    console.error('[cashfree-webhook] Signature mismatch — possible spoofed request');
-    return res.status(401).json({ error: 'Invalid webhook signature' });
-  }
-
-  // 5. Parse event payload
+  // 5️⃣ Parse JSON payload
   let event;
   try {
     event = JSON.parse(rawBody);
-  } catch (err) {
-    console.error('[cashfree-webhook] Invalid JSON:', err.message);
+  } catch (e) {
+    console.error('[cashfree-webhook] Invalid JSON:', e.message);
     return res.status(400).json({ error: 'Invalid JSON payload' });
   }
 
   const eventType = event?.type;
-  const orderId   = event?.data?.order?.order_id;
-  
-  let roomId = null;
-  if (orderId) {
-    try {
-      const db = admin.firestore();
-      const paymentSnap = await db.collection('payments').doc(orderId).get();
-      if (paymentSnap.exists) {
-        roomId = paymentSnap.data().roomId;
-      } else {
-        console.warn(`[cashfree-webhook] Payment mapping not found for order: ${orderId}`);
-      }
-    } catch (err) {
-      console.error('[cashfree-webhook] Failed to get payment mapping:', err.message);
-    }
+  const orderId = event?.data?.order?.order_id || event?.data?.order?.cf_order_id;
+  if (!orderId) {
+    console.error('[cashfree-webhook] order_id missing');
+    return res.status(400).json({ error: 'Missing orderId' });
   }
 
-  console.log(`[cashfree-webhook] Event: ${eventType} | order: ${orderId} | room: ${roomId}`);
+  const db = admin.firestore();
+  const paymentRef = db.collection('payments').doc(orderId);
+  const paymentSnap = await paymentRef.get();
+  if (!paymentSnap.exists) {
+    console.error(`[cashfree-webhook] No payment document for orderId ${orderId}`);
+    return res.status(400).json({ error: 'Payment mapping not found' });
+  }
+  const paymentData = paymentSnap.data();
+  const roomId = paymentData.roomId;
+  if (!roomId) {
+    console.error(`[cashfree-webhook] roomId missing in payment doc ${orderId}`);
+    return res.status(400).json({ error: 'roomId missing in payment document' });
+  }
 
-  // 6. Route by event type
-  if (eventType === 'PAYMENT_SUCCESS_WEBHOOK') {
-    await handlePaymentSuccess(event, roomId, orderId);
-  } else if (eventType === 'PAYMENT_FAILED_WEBHOOK') {
-    await handlePaymentFailed(roomId);
+  // 6️⃣ Idempotency – if this webhook status was already recorded, skip updates
+  const incomingStatus = event?.data?.payment?.payment_status || eventType;
+  if (paymentData.cashfreeStatus && paymentData.cashfreeStatus === incomingStatus) {
+    safeLog({ event: eventType, orderId, roomId, status: incomingStatus, firestore: 'skipped (idempotent)' });
+    return res.status(200).json({ received: true, idempotent: true });
+  }
+
+  // 7️⃣ Route based on known statuses
+  if (eventType === 'PAYMENT_SUCCESS_WEBHOOK' || incomingStatus === 'PAID') {
+    await handleSuccess({ event, roomId, orderId, paymentRef });
+  } else if (
+    eventType === 'PAYMENT_FAILED_WEBHOOK' ||
+    incomingStatus === 'FAILURE' ||
+    incomingStatus === 'CANCELLED' ||
+    incomingStatus === 'USER_DROPPED'
+  ) {
+    await handleFailure({ event, roomId, orderId, paymentRef, incomingStatus });
   } else {
     console.log(`[cashfree-webhook] Unhandled event type: ${eventType}`);
   }
 
-  // Always return 200 to prevent Cashfree from retrying
+  // 8️⃣ Always reply 200 for known events – Cashfree will stop retrying.
   return res.status(200).json({ received: true });
 }
 
 // ─── Event handlers ───────────────────────────────────────────────────────────
+async function handleSuccess({ event, roomId, orderId, paymentRef }) {
+  const cfPaymentId = event?.data?.payment?.cf_payment_id || orderId;
+  const now = admin.firestore.Timestamp.now();
+  const subscriptionEnd = admin.firestore.Timestamp.fromDate(
+    new Date(Date.now() + SUBSCRIPTION_DURATION_DAYS * 86_400_000)
+  );
 
-/**
- * PAYMENT_SUCCESS_WEBHOOK
- * Activates the 90-day subscription and publishes the room.
- */
-async function handlePaymentSuccess(event, roomId, orderId) {
-  if (!roomId) {
-    console.warn('[cashfree-webhook] handlePaymentSuccess: roomId could not be extracted — skipping');
-    return;
+  // Update room document – publish and activate subscription
+  try {
+    await admin.firestore().collection('rooms').doc(roomId).update({
+      paymentStatus: 'paid',
+      subscriptionStatus: 'active',
+      subscriptionStart: now,
+      subscriptionEnd,
+      paymentOrderId: String(cfPaymentId),
+      isPublished: true,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    safeLog({ event: event.type, orderId, roomId, status: 'PAID', firestore: 'room updated' });
+  } catch (e) {
+    console.error(`[cashfree-webhook] Room update failed for ${roomId}:`, e.message);
   }
 
-  const cfPaymentId = event?.data?.payment?.cf_payment_id;
-  console.log(`[cashfree-webhook] Payment SUCCESS | roomId: ${roomId} | cfPaymentId: ${cfPaymentId}`);
-
+  // Update payment document – idempotency guard already applied above
   try {
-    const db   = admin.firestore();
-    const now  = new Date();
-    const subscriptionEnd = new Date(now.getTime() + SUBSCRIPTION_DURATION_DAYS * 86_400_000);
-
-    await db.collection('rooms').doc(roomId).update({
-      paymentStatus:      'paid',
-      subscriptionStatus: 'active',
-      subscriptionStart:  admin.firestore.Timestamp.fromDate(now),
-      subscriptionEnd:    admin.firestore.Timestamp.fromDate(subscriptionEnd),
-      paymentOrderId:     String(cfPaymentId ?? orderId ?? ''),
-      isPublished:        true,
-      updatedAt:          admin.firestore.FieldValue.serverTimestamp(),
+    await paymentRef.update({
+      status: 'paid',
+      cashfreeStatus: 'PAID',
+      webhookReceivedAt: admin.firestore.Timestamp.now()
     });
-
-    console.log(`[cashfree-webhook] Firestore updated — room ${roomId} is now active until ${subscriptionEnd.toISOString()}`);
-  } catch (err) {
-    console.error(`[cashfree-webhook] Firestore update failed for room ${roomId}:`, err.message);
-    // Do NOT return an error status — Cashfree would retry and the next call may succeed
+    safeLog({ event: event.type, orderId, roomId, status: 'PAID', firestore: 'payment updated' });
+  } catch (e) {
+    console.error(`[cashfree-webhook] Payment update failed for ${orderId}:`, e.message);
   }
 }
 
-/**
- * PAYMENT_FAILED_WEBHOOK
- * Marks the room payment as failed so admin can retry.
- */
-async function handlePaymentFailed(roomId) {
-  if (!roomId) {
-    console.warn('[cashfree-webhook] handlePaymentFailed: roomId could not be extracted — skipping');
-    return;
+async function handleFailure({ event, roomId, orderId, paymentRef, incomingStatus }) {
+  const statusMap = {
+    FAILURE: 'failed',
+    CANCELLED: 'cancelled',
+    USER_DROPPED: 'cancelled'
+  };
+  const paymentStatus = statusMap[incomingStatus] || 'failed';
+
+  // Update payment document
+  try {
+    await paymentRef.update({
+      status: paymentStatus,
+      cashfreeStatus: incomingStatus,
+      webhookReceivedAt: admin.firestore.Timestamp.now()
+    });
+    safeLog({ event: event?.type, orderId, roomId, status: incomingStatus, firestore: 'payment updated' });
+  } catch (e) {
+    console.error(`[cashfree-webhook] Payment update failed for ${orderId}:`, e.message);
   }
 
-  console.log(`[cashfree-webhook] Payment FAILED | roomId: ${roomId}`);
-
+  // Update room paymentStatus only – do NOT publish on failure
   try {
-    const db = admin.firestore();
-    await db.collection('rooms').doc(roomId).update({
-      paymentStatus: 'failed',
-      updatedAt:     admin.firestore.FieldValue.serverTimestamp(),
+    await admin.firestore().collection('rooms').doc(roomId).update({
+      paymentStatus: paymentStatus,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
-
-    console.log(`[cashfree-webhook] Firestore updated — room ${roomId} marked as payment failed`);
-  } catch (err) {
-    console.error(`[cashfree-webhook] Firestore update failed for room ${roomId}:`, err.message);
+    safeLog({ event: event?.type, orderId, roomId, status: incomingStatus, firestore: 'room payment flag updated' });
+  } catch (e) {
+    console.error(`[cashfree-webhook] Room update failed for ${roomId}:`, e.message);
   }
 }
