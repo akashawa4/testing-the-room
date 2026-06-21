@@ -5,7 +5,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog.jsx';
 import { useLanguage } from '../contexts/LanguageContext.jsx';
 import { isSubscriptionActive, isExpiringSoon, getDaysUntilExpiry } from '../utils/subscriptionConfig.js';
 
-const RoomCard = memo(({ room, onViewDetails, isAdmin, onEdit, onDelete, isFirst, onBookNow, onToggleHidden, onRenew }) => {
+const RoomCard = memo(({ room, onViewDetails, isAdmin, isOwner, onEdit, onDelete, isFirst, onBookNow, onToggleHidden, onRenew, onVerify, onReject }) => {
   const { t } = useLanguage();
   const [modalOpen, setModalOpen] = useState(false);
   const [modalImageIdx, setModalImageIdx] = useState(0);
@@ -74,18 +74,29 @@ const RoomCard = memo(({ room, onViewDetails, isAdmin, onEdit, onDelete, isFirst
 
   return (
     <div className={`room-card p-3 sm:p-4 hover-lift h-full flex flex-col ${room.hidden ? 'opacity-60 border-2 border-dashed border-gray-400' : ''}`}>
-      {/* Hidden Badge for Admin */}
-      {room.hidden && isAdmin && (
+      {/* Hidden Badge for Admin or Owner */}
+      {room.hidden && (isAdmin || isOwner) && (
         <div className="absolute top-2 left-2 z-10 bg-gray-800/90 backdrop-blur-sm text-white text-[10px] sm:text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-lg">
           <EyeOff className="w-3 h-3" />
           <span className="hidden xs:inline">Hidden</span>
         </div>
       )}
+      {/* Verification Status Badge */}
+      {(isAdmin || isOwner) && room.verificationStatus === 'pending' && (
+        <div className="absolute top-2 right-2 z-10 bg-amber-500/90 backdrop-blur-sm text-white text-[10px] sm:text-xs font-bold px-2 py-1 rounded-full shadow-lg">
+          Pending Verification
+        </div>
+      )}
+      {(isAdmin || isOwner) && room.verificationStatus === 'rejected' && (
+        <div className="absolute top-2 right-2 z-10 bg-red-600/90 backdrop-blur-sm text-white text-[10px] sm:text-xs font-bold px-2 py-1 rounded-full shadow-lg">
+          Rejected
+        </div>
+      )}
       {/* Image Section (only first image visible) */}
-      <div className="relative mb-4 overflow-hidden rounded-xl flex-shrink-0">
+      <div className="relative mb-4 overflow-hidden rounded-xl flex-shrink-0 mt-2">
         <div className="w-full h-48 md:h-56 lg:h-64 bg-gradient-to-br from-orange-100 to-orange-50 flex items-center justify-center">
           {primaryImage ? (
-            <div className="h-full w-full flex-shrink-0 cursor-pointer" onClick={onViewDetails}>
+            <div className="h-full w-full flex-shrink-0 cursor-pointer" onClick={handleViewDetails}>
               <img
                 src={primaryImage}
                 alt={`${room.title} - 1`}
@@ -153,8 +164,8 @@ const RoomCard = memo(({ room, onViewDetails, isAdmin, onEdit, onDelete, isFirst
 
       {/* Enhanced Content Section */}
       <div className="space-y-2 flex-1 flex flex-col">
-        {/* Subscription Status for Admin */}
-        {isAdmin && hasSubscription && (
+        {/* Subscription Status for Admin or Owner */}
+        {(isAdmin || isOwner) && hasSubscription && (
           <div className="flex flex-wrap gap-1 mb-1">
             {room.paymentStatus === 'pending' && (
               <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-300">
@@ -254,9 +265,28 @@ const RoomCard = memo(({ room, onViewDetails, isAdmin, onEdit, onDelete, isFirst
           </Button>
         </div>
 
-        {/* Admin Actions */}
-        {isAdmin && (
+        {/* Admin and Owner Actions */}
+        {(isAdmin || isOwner) && (
           <div className="flex flex-col gap-1.5 sm:gap-2 mt-2">
+            {isAdmin && room.verificationStatus === 'pending' && (
+              <div className="grid grid-cols-2 gap-1.5 sm:gap-2 mb-1">
+                <Button
+                  onClick={() => onVerify && onVerify(room)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center gap-1 text-xs sm:text-sm h-9 sm:h-10 transition-colors"
+                  size="sm"
+                >
+                  Verify Room
+                </Button>
+                <Button
+                  onClick={() => onReject && onReject(room)}
+                  variant="outline"
+                  className="border-red-300 text-red-700 hover:bg-red-50 flex items-center justify-center gap-1 text-xs sm:text-sm h-9 sm:h-10 transition-colors"
+                  size="sm"
+                >
+                  Reject Room
+                </Button>
+              </div>
+            )}
             {hasSubscription && room.paymentStatus === 'pending' && (
               <Button
                 onClick={() => onRenew && onRenew(room)}

@@ -307,5 +307,5 @@ For support, visit [Nivase.com](https://nivase.com) or contact us at support@niv
 
 ---
 
-**Built with ❤️ for college students**
+
 

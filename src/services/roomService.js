@@ -62,7 +62,7 @@ export const fetchRooms = async () => {
 /**
  * Add a new room to Firestore with subscription fields initialized to pending
  */
-export const addRoom = async (roomData) => {
+export const addRoom = async (roomData, user, isAdmin) => {
     try {
         const roomsRef = collection(db, ROOMS_COLLECTION);
         
@@ -86,6 +86,14 @@ export const addRoom = async (roomData) => {
         const roomToAdd = omitUndefined({
             ...roomData,
             ...subscriptionFields,
+            ownerId: user?.uid || null,
+            ownerName: user?.displayName || null,
+            ownerEmail: user?.email || null,
+            ownerPhone: roomData.contact || null,
+            verificationStatus: isAdmin ? 'verified' : 'pending',
+            roomStatus: 'active',
+            visibility: 'visible',
+            verifiedAt: isAdmin ? serverTimestamp() : null,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
         });
@@ -100,10 +108,90 @@ export const addRoom = async (roomData) => {
         return {
             ...roomData,
             ...subscriptionFields,
+            ownerId: user?.uid || null,
+            ownerName: user?.displayName || null,
+            ownerEmail: user?.email || null,
+            ownerPhone: roomData.contact || null,
+            verificationStatus: isAdmin ? 'verified' : 'pending',
+            roomStatus: 'active',
+            visibility: 'visible',
             id: docRef.id
         };
     } catch (error) {
         console.error('Error adding room to Firestore:', error);
+        throw error;
+    }
+};
+
+/**
+ * Verify a room
+ */
+export const verifyRoom = async (roomId, adminId) => {
+    try {
+        const roomRef = doc(db, ROOMS_COLLECTION, roomId);
+        await updateDoc(roomRef, {
+            verificationStatus: 'verified',
+            verifiedAt: serverTimestamp(),
+            verifiedBy: adminId,
+            updatedAt: serverTimestamp()
+        });
+        return true;
+    } catch (error) {
+        console.error('Error verifying room:', error);
+        throw error;
+    }
+};
+
+/**
+ * Reject a room
+ */
+export const rejectRoom = async (roomId, adminId) => {
+    try {
+        const roomRef = doc(db, ROOMS_COLLECTION, roomId);
+        await updateDoc(roomRef, {
+            verificationStatus: 'rejected',
+            rejectedAt: serverTimestamp(),
+            rejectedBy: adminId,
+            updatedAt: serverTimestamp()
+        });
+        return true;
+    } catch (error) {
+        console.error('Error rejecting room:', error);
+        throw error;
+    }
+};
+
+/**
+ * Toggle room status (active/expired)
+ */
+export const updateRoomStatus = async (roomId, status) => {
+    try {
+        const roomRef = doc(db, ROOMS_COLLECTION, roomId);
+        await updateDoc(roomRef, {
+            roomStatus: status,
+            updatedAt: serverTimestamp()
+        });
+        return true;
+    } catch (error) {
+        console.error('Error updating room status:', error);
+        throw error;
+    }
+};
+
+/**
+ * Toggle room visibility (visible/hidden)
+ */
+export const toggleRoomVisibility = async (roomId, isVisible) => {
+    try {
+        const roomRef = doc(db, ROOMS_COLLECTION, roomId);
+        await updateDoc(roomRef, {
+            visibility: isVisible ? 'visible' : 'hidden',
+            hidden: !isVisible,
+            updatedAt: serverTimestamp()
+        });
+        return true;
+    } catch (error) {
+        console.error('Error toggling room visibility:', error);
         throw error;
     }
 };

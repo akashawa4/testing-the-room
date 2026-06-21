@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { User, Phone, Mail, Building, Save, Loader2, CheckCircle, Users, LogOut, MapPin } from 'lucide-react';
+import { User, Phone, Mail, Building, Save, Loader2, CheckCircle, Users, LogOut, MapPin, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button.jsx';
 import { Input } from '@/components/ui/input.jsx';
 import { Label } from '@/components/ui/label.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useUserPreferences } from '../contexts/UserPreferencesContext.jsx';
 import { db } from '../firebase.js';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import RoomCard from '../components/RoomCard.jsx';
 
 // List of colleges
 const COLLEGES = [
@@ -44,6 +45,8 @@ const ProfilePage = () => {
     const isOnboarding = searchParams.get('onboarding') === 'true';
 
     const [isLoading, setIsLoading] = useState(true);
+    const [isLoadingRooms, setIsLoadingRooms] = useState(true);
+    const [myRooms, setMyRooms] = useState([]);
     const [isSaving, setIsSaving] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -101,7 +104,26 @@ const ProfilePage = () => {
             }
         };
 
+        const fetchMyRooms = async () => {
+            if (user?.uid) {
+                try {
+                    const q = query(collection(db, 'rooms'), where('ownerId', '==', user.uid));
+                    const querySnapshot = await getDocs(q);
+                    const rooms = [];
+                    querySnapshot.forEach((doc) => {
+                        rooms.push({ id: doc.id, ...doc.data() });
+                    });
+                    setMyRooms(rooms);
+                } catch (error) {
+                    console.error("Error fetching user rooms:", error);
+                } finally {
+                    setIsLoadingRooms(false);
+                }
+            }
+        };
+
         fetchUserProfile();
+        fetchMyRooms();
     }, [user, isAuthenticated, navigate]);
 
     const handleInputChange = (field, value) => {
@@ -381,6 +403,50 @@ const ProfilePage = () => {
                             </div>
                         </form>
                     </div>
+                </div>
+
+                {/* My Rooms Section */}
+                {!isOnboarding && (
+                    <div className="bg-white rounded-2xl shadow-xl overflow-hidden mt-8 p-6 sm:p-8">
+                        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                            <Building className="w-6 h-6 text-orange-500" />
+                            My Rooms
+                        </h2>
+                        {isLoadingRooms ? (
+                            <div className="flex justify-center py-8">
+                                <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+                            </div>
+                        ) : myRooms.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {myRooms.map(room => (
+                                    <RoomCard
+                                        key={room.id}
+                                        room={room}
+                                        isOwner={true}
+                                        onViewDetails={() => {/* Provide dummy or implement view */}}
+                                        // Let them go back to Home for editing/deleting for now, or just show the status
+                                        // Edit/Delete handlers can be added similarly to App.jsx if needed
+                                    />
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center py-8 text-gray-500">
+                                You haven't uploaded any rooms yet.
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Admin Login Button */}
+                <div className="mt-8 flex justify-center">
+                    <Button 
+                        variant="outline" 
+                        className="text-gray-500 hover:text-orange-600 border-gray-200 hover:bg-orange-50"
+                        onClick={() => navigate('/admin/login')}
+                    >
+                        <Shield className="w-4 h-4 mr-2" />
+                        Admin Login
+                    </Button>
                 </div>
             </div>
         </div>

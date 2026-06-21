@@ -161,7 +161,7 @@ const RefundPolicyPage = () => {
                             </div>
                             <div className="flex items-center gap-2">
                                 <Phone className="w-5 h-5 text-orange-600" />
-                                <span className="text-orange-600 font-medium">+91 7385553529</span>
+                                <span className="text-orange-600 font-medium">+91 8999483116</span>
                             </div>
                         </div>
                     </section>

@@ -178,7 +178,7 @@ const TermsConditionsPage = () => {
                             If you have questions about these Terms & Conditions, contact us at:
                         </p>
                         <p className="text-orange-600 font-medium mt-2">contactnivasispace@gmail.com</p>
-                        <p className="text-gray-600 mt-1">Phone: +91 7385553529</p>
+                        <p className="text-gray-600 mt-1">Phone: +91 8999483116</p>
                     </section>
                 </div>
             </main>

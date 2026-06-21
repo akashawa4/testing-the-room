@@ -18,7 +18,8 @@ import {
   TermsConditionsPage,
   RefundPolicyPage,
   SafetyGuidelinesPage,
-  ProfilePage
+  ProfilePage,
+  AdminLoginPage
 } from './pages/index.js'
 
 createRoot(document.getElementById('root')).render(
@@ -39,6 +40,7 @@ createRoot(document.getElementById('root')).render(
                 <Route path="refund-policy" element={<RefundPolicyPage />} />
                 <Route path="safety-guidelines" element={<SafetyGuidelinesPage />} />
                 <Route path="profile" element={<ProfilePage />} />
+                <Route path="admin/login" element={<AdminLoginPage />} />
               </Route>
             </Routes>
           </UserPreferencesProvider>

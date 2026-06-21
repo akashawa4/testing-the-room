@@ -203,7 +203,7 @@ const SafetyGuidelinesPage = () => {
                             </div>
                             <div>
                                 <h3 className="font-semibold text-gray-900 mb-2">Nivasi Space Support</h3>
-                                <p className="text-2xl font-bold text-orange-600">+91 7385553529</p>
+                                <p className="text-2xl font-bold text-orange-600">+91 8999483116</p>
                             </div>
                         </div>
                     </section>

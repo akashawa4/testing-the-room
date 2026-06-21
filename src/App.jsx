@@ -404,6 +404,19 @@ function App() {
         return false;
       }
 
+      // Hide pending/rejected/expired/hidden rooms from normal users
+      if (!isAdmin) {
+        if (room.verificationStatus && room.verificationStatus !== 'verified') {
+          return false;
+        }
+        if (room.visibility === 'hidden') {
+          return false;
+        }
+        if (room.roomStatus === 'expired') {
+          return false;
+        }
+      }
+
       // Hide expired/unpaid listings from students (legacy/grandfathered rooms remain visible)
       if (!isAdmin && room.subscriptionStatus !== undefined) {
         const active = room.subscriptionStatus === 'active' && isSubscriptionActive(room.subscriptionEnd);
@@ -417,7 +430,11 @@ function App() {
       // Admin Filter
       if (isAdmin && adminFilter !== 'all') {
         const hasSub = room.subscriptionStatus !== undefined;
-        if (adminFilter === 'active') {
+        if (adminFilter === 'verifiedRooms') {
+          if (room.verificationStatus !== 'verified') return false;
+        } else if (adminFilter === 'pendingVerification') {
+          if (room.verificationStatus !== 'pending') return false;
+        } else if (adminFilter === 'active') {
           if (!hasSub || room.paymentStatus !== 'paid' || !isSubscriptionActive(room.subscriptionEnd)) return false;
         } else if (adminFilter === 'pending') {
           if (!hasSub || room.paymentStatus !== 'pending') return false;
@@ -486,13 +503,10 @@ function App() {
 
   const handleShowAddForm = useCallback(() => {
     requireAuth('add-room', () => {
-      if (isAdmin) {
-        setShowAddForm(true);
-      } else {
-        setShowAdminLogin(true);
-      }
+      // Normal users can now also add rooms, so we don't prompt Admin Login here
+      setShowAddForm(true);
     });
-  }, [isAdmin, requireAuth]);
+  }, [requireAuth]);
 
   const handleAdminLogin = useCallback(() => {
     requireAuth('admin', () => {
@@ -511,7 +525,7 @@ function App() {
   const handleAddRoom = useCallback(async (newRoom) => {
     try {
       const { addRoom } = await import('./services/roomService.js');
-      const savedRoom = await addRoom(newRoom);
+      const savedRoom = await addRoom(newRoom, user, isAdmin);
       setRooms(prev => deduplicateRooms([savedRoom, ...prev]));
       setShowAddForm(false);
       
@@ -610,6 +624,38 @@ function App() {
       });
     }
   }, []);
+
+  const handleVerifyRoom = useCallback(async (roomToVerify) => {
+    try {
+      const { verifyRoom } = await import('./services/roomService.js');
+      await verifyRoom(roomToVerify.id, user?.uid || 'admin');
+      setRooms(prev => deduplicateRooms(prev.map(r => r.id === roomToVerify.id ? { ...r, verificationStatus: 'verified' } : r)));
+      setNotification({
+        message: 'The room has been verified successfully.',
+        type: 'success',
+        isVisible: true,
+        title: 'Room Verified'
+      });
+    } catch (error) {
+      console.error('Error verifying room:', error);
+    }
+  }, [user]);
+
+  const handleRejectRoom = useCallback(async (roomToReject) => {
+    try {
+      const { rejectRoom } = await import('./services/roomService.js');
+      await rejectRoom(roomToReject.id, user?.uid || 'admin');
+      setRooms(prev => deduplicateRooms(prev.map(r => r.id === roomToReject.id ? { ...r, verificationStatus: 'rejected' } : r)));
+      setNotification({
+        message: 'The room has been rejected.',
+        type: 'info',
+        isVisible: true,
+        title: 'Room Rejected'
+      });
+    } catch (error) {
+      console.error('Error rejecting room:', error);
+    }
+  }, [user]);
 
   const handleRequestDeleteRoom = useCallback((room) => {
     setRoomToDelete(room);
@@ -1092,10 +1138,13 @@ function App() {
                         setShowBookingModal(true);
                       }}
                       isAdmin={isAdmin}
+                      isOwner={user && room.ownerId === user.uid}
                       onEdit={() => setEditRoom(room)}
                       onDelete={() => handleRequestDeleteRoom(room)}
                       onToggleHidden={() => handleRequestToggleHidden(room)}
                       onRenew={() => requireAuth('renew-room', () => handleRenewRoomSubscription(room))}
+                      onVerify={() => handleVerifyRoom(room)}
+                      onReject={() => handleRejectRoom(room)}
                       t={t}
                     />
                   ))}
@@ -1144,6 +1193,7 @@ function App() {
             <AddRoomModal
               onClose={() => setShowAddForm(false)}
               onAddRoom={handleAddRoom}
+              isAdmin={isAdmin}
             />
           </Suspense>
         )
@@ -1157,6 +1207,7 @@ function App() {
               onAddRoom={handleUpdateRoom}
               initialRoom={editRoom}
               isEdit
+              isAdmin={isAdmin}
             />
           </Suspense>
         )

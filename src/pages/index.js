@@ -8,4 +8,4 @@ export { default as TermsConditionsPage } from './TermsConditionsPage.jsx';
 export { default as RefundPolicyPage } from './RefundPolicyPage.jsx';
 export { default as SafetyGuidelinesPage } from './SafetyGuidelinesPage.jsx';
 export { default as ProfilePage } from './ProfilePage.jsx';
-
+export { default as AdminLoginPage } from './AdminLoginPage.jsx';

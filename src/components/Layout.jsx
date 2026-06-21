@@ -290,10 +290,10 @@ const Layout = () => {
                                         <div>
                                             <h3 className="font-semibold text-blue-800 mb-1">📞 Phone</h3>
                                             <a
-                                                href="tel:+917385553529"
+                                                href="tel:+918999483116"
                                                 className="text-sm text-blue-700 hover:text-blue-900 transition-colors"
                                             >
-                                                +91 7385553529
+                                                +91 8999483116
                                             </a>
                                         </div>
                                     </div>
@@ -320,7 +320,7 @@ const Layout = () => {
                                 {/* Action Buttons */}
                                 <div className="space-y-3">
                                     <Button
-                                        onClick={() => window.open('tel:+917385553529', '_self')}
+                                        onClick={() => window.open('tel:+918999483116', '_self')}
                                         className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                                     >
                                         <Phone className="w-4 h-4 mr-2" />

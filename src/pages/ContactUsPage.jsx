@@ -5,7 +5,7 @@ import PageHeader from '@/components/PageHeader.jsx';
 
 const ContactUsPage = () => {
     const handleWhatsApp = () => {
-        window.open('https://wa.me/917385553529?text=Hi, I found your contact on Nivasi Space and would like to inquire about room listings.', '_blank');
+        window.open('https://wa.me/918999483116?text=Hi, I found your contact on Nivasi Space and would like to inquire about room listings.', '_blank');
     };
 
     const handleEmail = () => {
@@ -13,7 +13,7 @@ const ContactUsPage = () => {
     };
 
     const handleCall = () => {
-        window.open('tel:+917385553529', '_blank');
+        window.open('tel:+918999483116', '_blank');
     };
 
     return (
@@ -45,7 +45,7 @@ const ContactUsPage = () => {
                                     </div>
                                     <div>
                                         <h3 className="font-semibold text-gray-900 text-lg">WhatsApp</h3>
-                                        <p className="text-green-600 font-medium">+91 7385553529</p>
+                                        <p className="text-green-600 font-medium">+91 8999483116</p>
                                         <p className="text-gray-500 text-sm">Fastest response • Usually within minutes</p>
                                     </div>
                                 </div>
@@ -62,7 +62,7 @@ const ContactUsPage = () => {
                                     </div>
                                     <div>
                                         <h3 className="font-semibold text-gray-900 text-lg">Phone</h3>
-                                        <p className="text-blue-600 font-medium">+91 7385553529</p>
+                                        <p className="text-blue-600 font-medium">+91 8999483116</p>
                                         <p className="text-gray-500 text-sm">Available 9 AM - 8 PM IST</p>
                                     </div>
                                 </div>

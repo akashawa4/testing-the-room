@@ -72,7 +72,7 @@ const CONDITION_OPTIONS = [
   { key: 'entryGateLocked', label: 'Entry gate locked after hours' }
 ];
 
-const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
+const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit, isAdmin }) => {
   const { t } = useLanguage();
   const [formData, setFormData] = useState(() => initialRoom ? {
     title: initialRoom.title || '',
@@ -243,7 +243,7 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
       newErrors.gender = t('genderRequired');
     }
 
-    if (formData.images.length === 0) {
+    if (isAdmin && formData.images.length === 0) {
       newErrors.images = t('imagesRequired');
     }
 
@@ -763,29 +763,50 @@ const AddRoomModal = ({ onClose, onAddRoom, initialRoom, isEdit }) => {
               )}
             </div>
 
-            {/* Images from /public (paths) */}
+            {/* Images - Conditional rendering based on admin status */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Upload className="w-4 h-4 inline mr-1" />
-                {t('images')} *
-              </label>
-              <p className="text-xs text-gray-500 mb-1">
-                Enter image paths from the <code>/public</code> folder, one per line. Example:
-                <br />
-                <span className="font-mono text-[11px]">
-                  /Sureh Pattar/upper/front.avif
-                </span>
-              </p>
-              <textarea
-                name="imagePaths"
-                value={formData.imagePaths}
-                onChange={handleImagePathsChange}
-                placeholder="/Owner Name/folder/image-1.avif&#10;/Owner Name/folder/image-2.avif"
-                rows="3"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-xs"
-              />
-              {errors.images && (
-                <p className="text-red-500 text-sm mt-1">{errors.images}</p>
+              {isAdmin ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <Upload className="w-4 h-4 inline mr-1" />
+                    {t('images')} *
+                  </label>
+                  <p className="text-xs text-gray-500 mb-1">
+                    Enter image paths from the <code>/public</code> folder, one per line. Example:
+                    <br />
+                    <span className="font-mono text-[11px]">
+                      /Sureh Pattar/upper/front.avif
+                    </span>
+                  </p>
+                  <textarea
+                    name="imagePaths"
+                    value={formData.imagePaths}
+                    onChange={handleImagePathsChange}
+                    placeholder="/Owner Name/folder/image-1.avif&#10;/Owner Name/folder/image-2.avif"
+                    rows="3"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-xs"
+                  />
+                  {errors.images && (
+                    <p className="text-red-500 text-sm mt-1">{errors.images}</p>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                  <h4 className="text-sm font-semibold text-orange-800 mb-2 flex items-center">
+                    <Upload className="w-4 h-4 mr-2" />
+                    Room Images
+                  </h4>
+                  <p className="text-sm text-orange-700 mb-2">
+                    To add images to your room listing, please send them to our WhatsApp number: <strong>+91 8999483116</strong>. Make sure to mention your room name or registered phone number.
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => window.open('https://wa.me/918999483116', '_blank')}
+                    className="mt-2"
+                  >
+                    Send Images via WhatsApp
+                  </Button>
+                </div>
               )}
 
               {/* Image Preview */}
